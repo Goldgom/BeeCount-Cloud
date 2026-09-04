@@ -714,14 +714,24 @@ async def update_investment_product(user: User, *, product_id: str, name: str | 
                                     market: str | None = None, account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
-                                    day_change: float | None = None) -> dict[str, Any]:
+                                    day_change: float | None = None,
+                                    use_auto_price: bool = False) -> dict[str, Any]:
     with SessionLocal() as db:
         row = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
         if row is None: raise ValueError("Investment product not found")
+        if use_auto_price:
+            row.current_price = None
+            row.price_source = None
+            row.last_market_close = None
+            row.day_change = None
         for key, value in (("name", name), ("symbol", symbol), ("quantity", quantity), ("cost_basis", cost_basis),
                            ("currency", currency), ("market", market), ("account_name", account_name), ("current_price", current_price),
                            ("last_market_close", last_market_close), ("day_change", day_change)):
             if value is not None: setattr(row, key, value.upper() if key in {"symbol", "currency"} else value)
+        if current_price is not None:
+            row.price_source = "manual"
+            row.last_market_close = last_market_close
+            row.day_change = day_change
         row.updated_at = datetime.now(timezone.utc); db.commit()
         return {"status": "updated", "id": row.id}
 

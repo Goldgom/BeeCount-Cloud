@@ -7,12 +7,14 @@ import {
   fetchWorkspaceCategories,
   fetchWorkspaceLedgerCounts,
   fetchWorkspaceTags,
+  fetchInvestmentAssets,
   type ReadBudget,
   type WorkspaceAccount,
   type WorkspaceAnalytics,
   type WorkspaceCategory,
   type WorkspaceLedgerCounts,
   type WorkspaceTag,
+  type InvestmentAssetsResponse,
 } from '@beecount/api-client'
 import { fetchBudgetsWithUsage, periodLabel, type BudgetUsage } from '@beecount/web-features'
 
@@ -93,6 +95,9 @@ export function OverviewPage() {
   const [budgetUsageById, setBudgetUsageById] = usePageCache<
     Record<string, BudgetUsage>
   >(`overview:${bucket}:budgetUsage`, {})
+  const [investmentAssets, setInvestmentAssets] = usePageCache<InvestmentAssetsResponse | null>(
+    `overview:${bucket}:investmentAssets`, null,
+  )
 
   const loadAccountsAndTags = useCallback(async () => {
     if (!activeLedgerId) return
@@ -223,6 +228,10 @@ export function OverviewPage() {
   }, [loadAccountsAndTags])
 
   useEffect(() => {
+    void fetchInvestmentAssets(token, true).then(setInvestmentAssets).catch(() => setInvestmentAssets(null))
+  }, [token, activeLedgerId])
+
+  useEffect(() => {
     void loadAnalytics()
   }, [loadAnalytics])
 
@@ -311,6 +320,7 @@ export function OverviewPage() {
         navigate(`/app/transactions${suffix}`)
       }}
       onCategoryClickFromTop={onCategoryClickFromHome}
+      investmentAssets={investmentAssets}
     />
   )
 }

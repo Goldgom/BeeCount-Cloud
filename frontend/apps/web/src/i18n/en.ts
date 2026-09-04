@@ -1144,6 +1144,8 @@ const en = {
   'accounts.investment.quantity': 'Quantity',
   'accounts.investment.price': 'Price',
   'accounts.investment.marketValue': 'Market value',
+  'accounts.investment.manualPrice': 'Manual price',
+  'accounts.investment.autoPrice': 'Auto quote',
   'categories.placeholder.customIcon': 'Custom icon',
   'common.remove': 'Remove',
   'theme.primaryAria': 'Theme color {color}',

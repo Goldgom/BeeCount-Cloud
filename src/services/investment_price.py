@@ -1,8 +1,8 @@
-"""Best-effort quote lookup for investment products.
+"""Free/open quote providers for investment products.
 
-Yahoo Finance's public chart endpoint is used by default.  Deployments can
-provide ``INVESTMENT_PRICE_URL`` with ``{symbol}`` and ``{market}`` tokens to
-use an internal/provider endpoint returning ``{"price": 123.4}``.
+Provider selection lives here so routers and MCP share the same behaviour.
+Yahoo Finance's public chart endpoint is the default; deployments may provide
+``INVESTMENT_PRICE_URL``. A manual current price is never overwritten.
 """
 from __future__ import annotations
 

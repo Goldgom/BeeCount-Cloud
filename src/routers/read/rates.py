@@ -71,6 +71,7 @@ class InvestmentHoldingOut(BaseModel):
     current_price: float | None = None
     last_market_close: float | None = None
     day_change: float | None = None
+    price_mode: str
     market_value: float
     daily_pnl: float
 
@@ -96,12 +97,13 @@ async def get_investment_assets(
     total = total_pnl = 0.0
     for row in rows:
         price, previous_close, day_change = row.current_price, row.last_market_close, row.day_change
-        if refresh:
+        if refresh and row.price_source != "manual":
             try:
                 quote = await fetch_price(row.symbol, row.market)
                 price = quote.get("price")
                 previous_close = quote.get("previous_close", previous_close)
                 day_change = quote.get("day_change", day_change)
+                row.price_source = quote.get("source")
                 row.current_price = price
                 row.last_market_close = previous_close
                 row.day_change = day_change
@@ -117,6 +119,7 @@ async def get_investment_assets(
             currency=row.currency, account_name=row.account_name,
             quantity=float(row.quantity or 0), cost_basis=float(row.cost_basis or 0),
             current_price=price, last_market_close=previous_close, day_change=day_change,
+            price_mode="manual" if row.price_source == "manual" else "auto",
             market_value=round(value, 2), daily_pnl=round(pnl, 2),
         ))
     return InvestmentAssetsOut(base_currency=base_currency, total_market_value=round(total, 2),

@@ -399,7 +399,11 @@ async def create_investment_product(ctx: Context, name: str, symbol: str, quanti
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
                                     day_change: float | None = None) -> dict[str, Any]:
-    """Record an investment product/holding."""
+    """Record a holding.
+
+    ``cost_basis`` is optional per-unit cost. ``current_price`` is an explicit
+    manual override; leave it blank to use the free quote provider.
+    """
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="create_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
         body=lambda user: write_tools.create_investment_product(user, **kw))
@@ -412,8 +416,13 @@ async def update_investment_product(ctx: Context, product_id: str, name: str | N
                                     market: str | None = None, account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
-                                    day_change: float | None = None) -> dict[str, Any]:
-    """Update an investment holding."""
+                                    day_change: float | None = None,
+                                    use_auto_price: bool = False) -> dict[str, Any]:
+    """Update holding; current_price is manual when supplied, otherwise auto quote.
+
+    Set ``use_auto_price=true`` to clear a manual price and resume the free
+    market-data provider. ``cost_basis`` is optional per-unit cost.
+    """
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="update_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
         body=lambda user: write_tools.update_investment_product(user, **kw))

@@ -767,6 +767,7 @@ export type InvestmentHolding = {
   current_price: number | null
   last_market_close: number | null
   day_change: number | null
+  price_mode: 'manual' | 'auto'
   market_value: number
   daily_pnl: number
 }

@@ -1186,6 +1186,8 @@ const zhCN = {
   'accounts.investment.quantity': '数量',
   'accounts.investment.price': '现价',
   'accounts.investment.marketValue': '市值',
+  'accounts.investment.manualPrice': '手动价',
+  'accounts.investment.autoPrice': '自动行情',
   'categories.placeholder.customIcon': '自定义图标',
   'common.remove': '移除',
   'theme.primaryAria': '主题色 {color}',

@@ -5,7 +5,8 @@ import type {
   WorkspaceAnalyticsSeriesItem,
   WorkspaceAnalyticsSummary,
   WorkspaceLedgerCounts,
-  WorkspaceTag
+  WorkspaceTag,
+  InvestmentAssetsResponse
 } from '@beecount/api-client'
 import { useT } from '@beecount/ui'
 import type { BudgetUsage } from '@beecount/web-features'
@@ -24,6 +25,7 @@ import { HomeTopAccounts } from '../dashboard/HomeTopAccounts'
 import { AssetCompositionDonut } from '../dashboard/AssetCompositionDonut'
 import { MonthlyTrendBars } from '../dashboard/MonthlyTrendBars'
 import { TopCategoriesList } from '../dashboard/TopCategoriesList'
+import { HomeInvestmentHoldings } from '../dashboard/HomeInvestmentHoldings'
 
 interface Props {
   accounts: WorkspaceAccount[]
@@ -45,6 +47,7 @@ interface Props {
   /** Top 卡片点击分类名时的钩子 — page 端反查 WorkspaceCategory 后派发详情。
    *  没传则 Top 卡片回退到 onJumpToTransactionsWithQuery。 */
   onCategoryClickFromTop?: (name: string, kind: 'expense' | 'income') => void
+  investmentAssets: InvestmentAssetsResponse | null
 }
 
 /**
@@ -76,6 +79,7 @@ export function OverviewSection({
   budgetUsageById,
   onJumpToTransactionsWithQuery,
   onCategoryClickFromTop,
+  investmentAssets,
 }: Props) {
   const t = useT()
   const { ledgers, activeLedgerId, currency } = useLedgers()
@@ -109,6 +113,8 @@ export function OverviewSection({
         ledgerCounts={ledgerCounts || undefined}
         currency={currency}
       />
+
+      <HomeInvestmentHoldings data={investmentAssets} />
 
       {/* 扩展分析:Web 端独有的加强仪表,不属于 mobile 首页对标范围 */}
       <div className="flex items-center gap-2 pt-2">
