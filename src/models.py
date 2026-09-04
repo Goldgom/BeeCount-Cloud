@@ -629,6 +629,12 @@ class InvestmentProduct(Base):
     account_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     quantity: Mapped[float] = mapped_column(Float, default=0.0)
     cost_basis: Mapped[float] = mapped_column(Float, default=0.0)
+    # Money-market funds use confirmed shares at a fixed NAV of 1.0000.  The
+    # principal is tracked separately so reinvested dividends lower effective
+    # cost instead of being mistaken for new subscriptions.
+    is_money_fund: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false(), default=False)
+    net_subscription_principal: Mapped[float | None] = mapped_column(Float, nullable=True)
+    daily_income: Mapped[float | None] = mapped_column(Float, nullable=True)
     current_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     price_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -135,7 +135,7 @@ export function GlobalEntityDialogs() {
       // Investment holdings are account-id bound, so fetch once for the detail
       // dialog and select by the stable account id at render time.
       if (acc.account_type === 'investment') {
-        void fetchInvestmentAssets(token, false).then(setInvestmentAssets).catch(() => setInvestmentAssets(null))
+        void fetchInvestmentAssets(token, true).then(setInvestmentAssets).catch(() => setInvestmentAssets(null))
       } else {
         setInvestmentAssets(null)
       }

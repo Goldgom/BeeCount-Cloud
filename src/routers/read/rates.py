@@ -78,6 +78,8 @@ class InvestmentHoldingOut(BaseModel):
     market_value: float
     daily_pnl: float
     holding_pnl: float
+    is_money_fund: bool = False
+    daily_income: float | None = None
 
 
 class InvestmentAccountAssetsOut(BaseModel):
@@ -120,9 +122,10 @@ async def get_investment_assets(
     account_daily_pnls = {key: 0.0 for key in account_values}
     for row in rows:
         price, previous_close, day_change = row.current_price, row.last_market_close, row.day_change
-        if refresh and row.price_source != "manual":
+        quote: dict = {}
+        if refresh and (row.is_money_fund or row.price_source != "manual"):
             try:
-                quote = await fetch_price(row.symbol, row.market)
+                quote = await fetch_price(row.symbol, "fund" if row.is_money_fund else row.market)
                 price = quote.get("price")
                 previous_close = quote.get("previous_close", previous_close)
                 day_change = quote.get("day_change", day_change)
@@ -136,10 +139,15 @@ async def get_investment_assets(
         # An automatic quote may be unavailable (provider outage, unknown
         # symbol, or an empty response).  Keep the row eligible for a future
         # refresh, but value it at cost for this response instead of zero.
-        valuation_price = float(price) if price is not None else float(row.cost_basis or 0)
+        valuation_price = 1.0 if row.is_money_fund else (float(price) if price is not None else float(row.cost_basis or 0))
         value = float(row.quantity or 0) * valuation_price
-        pnl = float(row.quantity or 0) * float(day_change or 0)
-        holding_pnl = float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
+        pnl = float(row.daily_income or 0) if row.is_money_fund else float(row.quantity or 0) * float(day_change or 0)
+        if row.is_money_fund and refresh:
+            per_10000 = quote.get("daily_income_per_10000")
+            if per_10000 is not None:
+                pnl = float(row.quantity or 0) / 10000.0 * float(per_10000)
+        principal = float(row.net_subscription_principal) if row.is_money_fund and row.net_subscription_principal is not None else float(row.quantity or 0) * float(row.cost_basis or 0)
+        holding_pnl = (value - principal) if row.is_money_fund else float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
         total += value
         total_pnl += pnl
         item = InvestmentHoldingOut(
@@ -151,6 +159,7 @@ async def get_investment_assets(
             price_status=("manual" if row.price_source == "manual" else "live" if price is not None else "fallback"),
             market_value=round(value, 2), daily_pnl=round(pnl, 2),
             holding_pnl=round(holding_pnl, 2),
+            is_money_fund=bool(row.is_money_fund), daily_income=round(pnl, 2) if row.is_money_fund else row.daily_income,
         )
         items.append(item)
         if row.account_id in account_values:

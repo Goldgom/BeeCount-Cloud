@@ -291,9 +291,10 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
             source = row.price_source or "manual"
             last_close = row.last_market_close
             day_change = row.day_change
-            if refresh and row.price_source != "manual":
+            quote: dict[str, Any] = {}
+            if refresh and (row.is_money_fund or row.price_source != "manual"):
                 try:
-                    quote = await fetch_price(row.symbol, row.market)
+                    quote = await fetch_price(row.symbol, "fund" if row.is_money_fund else row.market)
                     price, source = quote["price"], quote["source"]
                     last_close = quote.get("previous_close", last_close)
                     day_change = quote.get("day_change", day_change)
@@ -304,12 +305,17 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                     pass
             # Keep automatic pricing retryable, but never value an unquoted
             # holding at zero: cost_basis is the deterministic fallback.
-            valuation_price = float(price) if price is not None else float(row.cost_basis or 0)
+            valuation_price = 1.0 if row.is_money_fund else (float(price) if price is not None else float(row.cost_basis or 0))
             if price is None and row.price_source != "manual":
                 source = "cost_basis_fallback"
             value = float(row.quantity or 0) * valuation_price
-            daily_pnl = float(row.quantity or 0) * float(day_change or 0)
-            holding_pnl = float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
+            daily_pnl = float(row.daily_income or 0) if row.is_money_fund else float(row.quantity or 0) * float(day_change or 0)
+            if row.is_money_fund and refresh:
+                per_10000 = quote.get("daily_income_per_10000")
+                if per_10000 is not None:
+                    daily_pnl = float(row.quantity or 0) / 10000.0 * float(per_10000)
+            principal = float(row.net_subscription_principal) if row.is_money_fund and row.net_subscription_principal is not None else float(row.quantity or 0) * float(row.cost_basis or 0)
+            holding_pnl = (value - principal) if row.is_money_fund else float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
             total_daily_pnl += daily_pnl
             native = value
             ccy = (row.currency or profile_currency).upper()
@@ -331,6 +337,8 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                           "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,
                           "market_value": round(value, 2), "market_value_base": round(native, 2),
                           "daily_pnl": round(daily_pnl, 2), "holding_pnl": round(holding_pnl, 2)}
+            item["is_money_fund"] = bool(row.is_money_fund)
+            item["daily_income"] = round(daily_pnl, 2) if row.is_money_fund else row.daily_income
             items.append(item)
             if row.account_id in account_values:
                 account_items[row.account_id].append(item)
@@ -362,6 +370,8 @@ def list_investment_products(user: User) -> list[dict[str, Any]]:
                  "quantity": r.quantity, "cost_basis": r.cost_basis,
                  "current_price": r.current_price,
                  "price_mode": "manual" if r.price_source == "manual" else "auto",
+                 "is_money_fund": bool(r.is_money_fund), "net_subscription_principal": r.net_subscription_principal,
+                 "daily_income": r.daily_income,
                  "last_market_close": r.last_market_close,
                  "day_change": r.day_change,
                  "price_updated_at": r.price_updated_at.isoformat() if r.price_updated_at else None} for r in rows]
@@ -376,6 +386,8 @@ def get_investment_product(user: User, product_id: str) -> dict[str, Any] | None
                 "currency": r.currency, "account_id": r.account_id, "account_name": r.account_name, "quantity": r.quantity,
                 "cost_basis": r.cost_basis, "current_price": r.current_price,
                 "price_mode": "manual" if r.price_source == "manual" else "auto",
+                "is_money_fund": bool(r.is_money_fund), "net_subscription_principal": r.net_subscription_principal,
+                "daily_income": r.daily_income,
                 "last_market_close": r.last_market_close, "day_change": r.day_change,
                 "price_source": r.price_source,
                 "price_updated_at": r.price_updated_at.isoformat() if r.price_updated_at else None}

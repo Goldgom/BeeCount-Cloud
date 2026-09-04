@@ -772,6 +772,9 @@ export type InvestmentHolding = {
   day_change: number | null
   price_mode: 'manual' | 'auto'
   price_status?: 'manual' | 'live' | 'fallback'
+  is_money_fund?: boolean
+  net_subscription_principal?: number | null
+  daily_income?: number | null
   market_value: number
   daily_pnl: number
   holding_pnl: number

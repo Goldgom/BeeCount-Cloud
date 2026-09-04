@@ -38,6 +38,9 @@ class InvestmentProductCreate(BaseModel):
     current_price: float | None = Field(default=None, ge=0, description="Manual price; omit for auto quote")
     last_market_close: float | None = Field(default=None, ge=0)
     day_change: float | None = None
+    is_money_fund: bool = False
+    net_subscription_principal: float | None = Field(default=None, ge=0)
+    daily_income: float | None = None
 
     @field_validator("name", "symbol", "currency")
     @classmethod
@@ -61,6 +64,9 @@ class InvestmentProductPatch(BaseModel):
     last_market_close: float | None = Field(default=None, ge=0)
     day_change: float | None = None
     use_auto_price: bool = False
+    is_money_fund: bool | None = None
+    net_subscription_principal: float | None = Field(default=None, ge=0)
+    daily_income: float | None = None
 
 
 class InvestmentProductOut(BaseModel):
@@ -75,6 +81,9 @@ class InvestmentProductOut(BaseModel):
     cost_basis: float
     current_price: float | None
     price_mode: str
+    is_money_fund: bool
+    net_subscription_principal: float | None
+    daily_income: float | None
 
 
 def _out(row: InvestmentProduct) -> InvestmentProductOut:
@@ -82,8 +91,10 @@ def _out(row: InvestmentProduct) -> InvestmentProductOut:
         id=row.id, name=row.name, symbol=row.symbol, market=row.market,
         currency=row.currency, account_id=row.account_id, account_name=row.account_name,
         quantity=float(row.quantity or 0), cost_basis=float(row.cost_basis or 0),
-        current_price=row.current_price,
+        current_price=1.0 if row.is_money_fund else row.current_price,
         price_mode="manual" if row.price_source == "manual" else "auto",
+        is_money_fund=bool(row.is_money_fund), net_subscription_principal=row.net_subscription_principal,
+        daily_income=row.daily_income,
     )
 
 
@@ -96,14 +107,21 @@ def create_investment_product(
 ) -> InvestmentProductOut:
     account_id = req.account_id or _account_id_by_legacy_name(db, current_user.id, req.account_name)
     account = _require_investment_account(db, current_user.id, account_id)
+    principal = req.net_subscription_principal
+    if req.is_money_fund:
+        principal = req.quantity * (req.cost_basis if req.cost_basis is not None else 1.0) if principal is None else principal
+        effective_cost = principal / req.quantity if req.quantity > 0 else 0.0
+    else:
+        effective_cost = req.cost_basis or 0
     row = InvestmentProduct(
         id=str(uuid4()), user_id=current_user.id, name=req.name.strip(),
         symbol=req.symbol.strip().upper(), quantity=req.quantity,
-        cost_basis=req.cost_basis or 0, currency=req.currency.strip().upper(),
+        cost_basis=effective_cost, currency=req.currency.strip().upper(), is_money_fund=req.is_money_fund,
+        net_subscription_principal=principal if req.is_money_fund else None, daily_income=req.daily_income,
         market=req.market.strip() if req.market else None,
         account_id=account.sync_id, account_name=account.name,
-        current_price=req.current_price, last_market_close=req.last_market_close,
-        day_change=req.day_change, price_source="manual" if req.current_price is not None else None,
+        current_price=1.0 if req.is_money_fund else req.current_price, last_market_close=req.last_market_close,
+        day_change=req.day_change, price_source="money_fund" if req.is_money_fund else ("manual" if req.current_price is not None else None),
     )
     db.add(row)
     db.commit()
@@ -123,6 +141,7 @@ def update_investment_product(
     if row is None:
         raise HTTPException(status_code=404, detail="Investment product not found")
     payload = req.model_dump(exclude_unset=True)
+    money_fund_changed = payload.get("is_money_fund", row.is_money_fund)
     if "account_id" in payload:
         account = _require_investment_account(db, current_user.id, payload.pop("account_id"))
         row.account_id, row.account_name = account.sync_id, account.name
@@ -154,6 +173,15 @@ def update_investment_product(
         if key == "name" and value is None:
             raise HTTPException(status_code=422, detail="name must not be blank")
         setattr(row, key, value)
+    if money_fund_changed:
+        row.current_price = 1.0
+        if row.net_subscription_principal is None:
+            row.net_subscription_principal = float(row.quantity or 0) * float(row.cost_basis or 1.0)
+        row.cost_basis = (float(row.net_subscription_principal) / float(row.quantity)) if row.quantity else 0.0
+        row.price_source = "money_fund"
+    elif payload.get("is_money_fund") is False and "current_price" not in payload:
+        row.current_price = row.last_market_close = row.day_change = None
+        row.price_source = None
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)

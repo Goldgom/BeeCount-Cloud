@@ -404,13 +404,19 @@ async def create_investment_product(ctx: Context, name: str, symbol: str, quanti
                                     account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
-                                    day_change: float | None = None) -> dict[str, Any]:
+                                    day_change: float | None = None,
+                                    is_money_fund: bool = False,
+                                    net_subscription_principal: float | None = None,
+                                    daily_income: float | None = None) -> dict[str, Any]:
     """Record a holding bound to one of the user's investment accounts.
 
     ``account_id`` is the stable investment-account id and is required. Legacy
     ``account_name`` is only accepted to resolve an existing investment account;
     never use it for a new relationship. ``cost_basis`` is per-unit. Supplying
     ``current_price`` makes it a manual override; omit it for the quote provider.
+    Set ``is_money_fund=true`` for money-market funds: NAV is fixed at 1.0000,
+    cumulative net subscription principal drives total P&L, and daily_income
+    is used for today's return instead of NAV movement.
     """
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="create_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
@@ -426,12 +432,17 @@ async def update_investment_product(ctx: Context, product_id: str, name: str | N
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
                                     day_change: float | None = None,
+                                    is_money_fund: bool | None = None,
+                                    net_subscription_principal: float | None = None,
+                                    daily_income: float | None = None,
                                     use_auto_price: bool = False) -> dict[str, Any]:
     """Update a holding, including moving it to a different investment account.
 
     Set ``use_auto_price=true`` to clear a manual price and resume the free
     market-data provider. ``account_id`` is the preferred stable binding;
     ``account_name`` is legacy lookup only. ``cost_basis`` is per-unit cost.
+    For money funds, set ``is_money_fund=true`` and maintain
+    ``net_subscription_principal``/``daily_income``; NAV remains 1.0000.
     """
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="update_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
