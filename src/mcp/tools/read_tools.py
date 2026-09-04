@@ -325,6 +325,7 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                           "currency": ccy, "account_id": row.account_id, "account_name": row.account_name, "quantity": row.quantity,
                           "cost_basis": row.cost_basis, "price": valuation_price, "price_source": source,
                           "price_mode": "manual" if source == "manual" else "auto",
+                          "price_status": ("manual" if row.price_source == "manual" else "live" if price is not None else "fallback"),
                           "last_market_close": last_close, "day_change": day_change,
                           "cost_basis_total": round(float(row.cost_basis or 0), 2),
                           "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,

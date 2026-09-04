@@ -74,6 +74,7 @@ class InvestmentHoldingOut(BaseModel):
     last_market_close: float | None = None
     day_change: float | None = None
     price_mode: str
+    price_status: str = "live"  # manual | live | fallback (cost basis)
     market_value: float
     daily_pnl: float
     holding_pnl: float
@@ -147,6 +148,7 @@ async def get_investment_assets(
             quantity=float(row.quantity or 0), cost_basis=float(row.cost_basis or 0),
             current_price=valuation_price, last_market_close=previous_close, day_change=day_change,
             price_mode="manual" if row.price_source == "manual" else "auto",
+            price_status=("manual" if row.price_source == "manual" else "live" if price is not None else "fallback"),
             market_value=round(value, 2), daily_pnl=round(pnl, 2),
             holding_pnl=round(holding_pnl, 2),
         )

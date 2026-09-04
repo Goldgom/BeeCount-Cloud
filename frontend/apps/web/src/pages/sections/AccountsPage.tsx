@@ -448,6 +448,16 @@ export function AccountsPage() {
     ),
     [investmentAssets],
   )
+  const investmentPriceStatuses = useMemo<Record<string, 'manual' | 'fallback' | 'live'>>(
+    () => Object.fromEntries(
+      (investmentAssets?.investment_accounts ?? []).map((account) => {
+        const hasFallback = account.items.some((item) => item.price_status === 'fallback')
+        const hasManual = account.items.some((item) => item.price_status === 'manual')
+        return [account.account_id, hasFallback ? 'fallback' : hasManual ? 'manual' : 'live']
+      }),
+    ),
+    [investmentAssets],
+  )
 
   return (
     <>
@@ -651,6 +661,7 @@ export function AccountsPage() {
         canManage
         hideCurrencyCards
         investmentValuations={investmentValuations}
+        investmentPriceStatuses={investmentPriceStatuses}
         onFormChange={setForm}
         onSave={onSave}
         onReset={() => setForm(accountDefaults())}

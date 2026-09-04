@@ -55,6 +55,8 @@ type MobileStyleAssetsProps = {
   /** Bound holding market value by investment account id.  Cash remains on the
    * account row; tiles add this amount once to show the account's total value. */
   investmentValuations?: Record<string, number>
+  /** Per investment account quote state: manual or fallback (yellow warning). */
+  investmentPriceStatuses?: Record<string, 'manual' | 'fallback' | 'live'>
   /** 账户隐藏(issue #240):底部「已隐藏」分区里,每张隐藏卡的快捷「恢复」
    *  按钮回调(不经编辑弹窗,直接 PATCH hidden=false)。不传则不渲染该按钮。 */
   onRestore?: (row: ReadAccount) => void
@@ -77,6 +79,7 @@ function MobileStyleAssets({
   onCreate,
   hideCurrencyCards = false,
   investmentValuations = {},
+  investmentPriceStatuses = {},
   onRestore
 }: MobileStyleAssetsProps) {
   const t = useT()
@@ -202,6 +205,7 @@ function MobileStyleAssets({
                       isLiability={group.isLiability}
                       canManage={canManage}
                       investmentValuation={investmentValuations[row.id] ?? 0}
+                      investmentPriceStatus={investmentPriceStatuses[row.id]}
                       onEdit={() => onEdit(row)}
                       onDelete={onDelete ? () => onDelete(row) : undefined}
                       onClick={onClickAccount ? () => onClickAccount(row) : undefined}
@@ -564,6 +568,7 @@ function BankCardTile({
   isLiability,
   canManage,
   investmentValuation = 0,
+  investmentPriceStatus,
   onEdit,
   onDelete,
   onClick
@@ -573,6 +578,7 @@ function BankCardTile({
   isLiability: boolean
   canManage: boolean
   investmentValuation?: number
+  investmentPriceStatus?: 'manual' | 'fallback' | 'live'
   onEdit: () => void
   onDelete?: () => void
   onClick?: () => void
@@ -598,6 +604,11 @@ function BankCardTile({
   const recentNet = (row.income_total ?? 0) - (row.expense_total ?? 0)
   const bankName = row.bank_name?.trim() || ''
   const bankMark = bankName ? bankName.slice(0, 2).toUpperCase() : accountType === 'credit_card' ? 'CC' : 'BK'
+  const quoteOverlay = accountType === 'investment' && investmentPriceStatus === 'fallback'
+    ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.92), rgba(234, 179, 8, 0.78)), '
+    : accountType === 'investment' && investmentPriceStatus === 'manual'
+      ? 'linear-gradient(135deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.18)), '
+      : ''
 
   return (
     <div
@@ -607,7 +618,7 @@ function BankCardTile({
       style={{
         // 比 16:10 稍高一点，正文能放三列 stats 不挤。
         aspectRatio: '16 / 10',
-        background: `linear-gradient(135deg, ${color} 0%, ${color}d9 40%, ${color}99 75%, ${color}66 100%)`,
+        background: `${quoteOverlay}linear-gradient(135deg, ${color} 0%, ${color}d9 40%, ${color}99 75%, ${color}66 100%)`,
         boxShadow: `0 4px 12px -4px ${color}66, 0 1px 2px rgba(0,0,0,0.06)`
       }}
       onClick={onClick}
@@ -1073,6 +1084,7 @@ type AccountsPanelProps = {
    *  其它调用方零影响。详见 MobileStyleAssets。 */
   hideCurrencyCards?: boolean
   investmentValuations?: Record<string, number>
+  investmentPriceStatuses?: Record<string, 'manual' | 'fallback' | 'live'>
   /** 账户隐藏(issue #240):底部「已隐藏」分区每张卡的快捷「恢复」按钮回调。
    *  不传则该按钮不渲染(调用方尚未接线时零影响)。 */
   onRestore?: (row: ReadAccount) => void
@@ -1091,6 +1103,7 @@ export function AccountsPanel({
   onClickAccount,
   hideCurrencyCards = false,
   investmentValuations = {},
+  investmentPriceStatuses = {},
   onRestore
 }: AccountsPanelProps) {
   const t = useT()
@@ -1173,6 +1186,7 @@ export function AccountsPanel({
           onCreate={handleOpenCreate}
         hideCurrencyCards={hideCurrencyCards}
         investmentValuations={investmentValuations}
+        investmentPriceStatuses={investmentPriceStatuses}
           onRestore={onRestore}
         />
       )}
