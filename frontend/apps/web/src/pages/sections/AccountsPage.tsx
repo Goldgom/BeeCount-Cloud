@@ -354,6 +354,25 @@ export function AccountsPage() {
   //   - mergedGroups:各币种 groups × 汇率折算后按 type 聚合成一份主币种构成,喂 donut(currency=effectiveBase)。
   const converted = useMemo(() => {
     const byCur = splitByCurrency(rows)
+    // Workspace account balances already include an investment account's cash.
+    // Add only its bound holdings here, otherwise cash would be double-counted.
+    // Holdings may use a currency different from their account, so aggregate by
+    // the product currency before the existing exchange-rate conversion.
+    const holdingValueByCurrency = new Map<string, number>()
+    const boundInvestmentAccountIds = new Set(
+      investmentAssets?.investment_accounts.map((account) => account.account_id) ?? [],
+    )
+    for (const item of investmentAssets?.items ?? []) {
+      if (!item.account_id || !boundInvestmentAccountIds.has(item.account_id)) continue
+      const currency = (item.currency || 'CNY').toUpperCase()
+      holdingValueByCurrency.set(
+        currency,
+        (holdingValueByCurrency.get(currency) ?? 0) + item.market_value,
+      )
+      // A foreign-currency holding still needs a bucket even if no cash account
+      // uses that currency, so it can be converted (or explicitly marked missing).
+      if (!byCur.has(currency)) byCur.set(currency, [])
+    }
     if (byCur.size === 0) return null
     // 主币种未设时:单币种回退到该唯一币种(折算率 1,零误差);多币种则无从折算。
     const effectiveBase = base || (byCur.size === 1 ? [...byCur.keys()][0] : '')
@@ -367,9 +386,26 @@ export function AccountsPage() {
     let liabilityTotal = 0
     const missing = new Set<string>()
     for (const [cur, curRows] of byCur) {
-      const summary = computeCurrencySummary(curRows)
+      const cashSummary = computeCurrencySummary(curRows)
+      const holdingsMarketValue = holdingValueByCurrency.get(cur) ?? 0
+      const summary = {
+        assetTotal: cashSummary.assetTotal + holdingsMarketValue,
+        liabilityTotal: cashSummary.liabilityTotal,
+        netWorth: cashSummary.netWorth + holdingsMarketValue,
+      }
       // 详情 dialog 复用 CurrencyAssetCard,需要全部币种(含缺失汇率的)原样展示。
-      buckets.push({ currency: cur, summary, groups: computeTypeGroups(curRows, t) })
+      const groups = computeTypeGroups(curRows, t)
+      if (holdingsMarketValue !== 0) {
+        groups.push({
+          type: 'investment',
+          label: t('accountType.investment'),
+          color: '#ec4899',
+          isLiability: false,
+          rows: [],
+          subtotals: [{ currency: cur, value: holdingsMarketValue }],
+        })
+      }
+      buckets.push({ currency: cur, summary, groups })
       const eff = effectiveRateToBase(cur, effectiveBase, rates, rateOverrides)
       if (!eff) {
         missing.add(cur)
@@ -399,7 +435,7 @@ export function AccountsPage() {
       missing: [...missing].sort(),
       rateDate: singleCurrency ? undefined : rates?.rate_date,
     }
-  }, [base, rows, rates, rateOverrides, t])
+  }, [base, rows, rates, rateOverrides, investmentAssets, t])
 
   return (
     <>
