@@ -623,6 +623,9 @@ class InvestmentProduct(Base):
     symbol: Mapped[str] = mapped_column(String(64), index=True)
     market: Mapped[str | None] = mapped_column(String(32), nullable=True)
     currency: Mapped[str] = mapped_column(String(16), default="CNY", server_default="CNY")
+    # Stable link to UserAccountProjection.sync_id.  account_name is retained
+    # as a denormalized display value for old clients and historical rows.
+    account_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     account_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     quantity: Mapped[float] = mapped_column(Float, default=0.0)
     cost_basis: Mapped[float] = mapped_column(Float, default=0.0)
@@ -636,6 +639,7 @@ class InvestmentProduct(Base):
 
 
 Index("ix_investment_products_user_symbol", InvestmentProduct.user_id, InvestmentProduct.symbol)
+Index("ix_investment_products_user_account", InvestmentProduct.user_id, InvestmentProduct.account_id)
 
 
 class UserExchangeRateProjection(Base):

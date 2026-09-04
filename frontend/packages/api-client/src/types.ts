@@ -763,6 +763,7 @@ export type InvestmentHolding = {
   symbol: string
   market: string | null
   currency: string
+  account_id: string | null
   account_name: string | null
   quantity: number
   cost_basis: number
@@ -775,10 +776,24 @@ export type InvestmentHolding = {
   holding_pnl: number
 }
 
+export type InvestmentAccountAssets = {
+  account_id: string
+  account_name: string
+  currency: string
+  cash_balance: number
+  holdings_market_value: number
+  total_assets: number
+  daily_pnl: number
+  items: InvestmentHolding[]
+}
+
 export type InvestmentAssetsResponse = {
   base_currency: string
   total_market_value: number
   total_daily_pnl: number
+  total_cash_balance: number
+  total_assets: number
+  investment_accounts: InvestmentAccountAssets[]
   items: InvestmentHolding[]
 }
 

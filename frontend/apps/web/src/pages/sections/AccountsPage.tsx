@@ -552,7 +552,7 @@ export function AccountsPage() {
           </CardContent>
         </Card>
       )}
-      {investmentAssets && investmentAssets.items.length > 0 ? (
+      {investmentAssets && investmentAssets.investment_accounts.length > 0 ? (
         <Card className="bc-panel mb-4">
           <CardContent className="space-y-3 p-5">
             <div className="flex flex-wrap items-end justify-between gap-2">
@@ -561,8 +561,9 @@ export function AccountsPage() {
                 <p className="text-xs text-muted-foreground">{t('accounts.investment.subtitle')}</p>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-muted-foreground">{t('accounts.investment.totalValue')}</div>
-                <Amount value={investmentAssets.total_market_value} currency={investmentAssets.base_currency} showCurrency bold />
+                <div className="text-[10px] text-muted-foreground">Total assets</div>
+                <Amount value={investmentAssets.total_assets} currency={investmentAssets.base_currency} showCurrency bold />
+                <div className="text-xs text-muted-foreground">Cash {investmentAssets.total_cash_balance.toFixed(2)} · Holdings {investmentAssets.total_market_value.toFixed(2)}</div>
                 <div className={investmentAssets.total_daily_pnl >= 0 ? 'text-xs text-emerald-600' : 'text-xs text-rose-600'}>
                   {t('accounts.investment.dailyPnl')}: {investmentAssets.total_daily_pnl >= 0 ? '+' : ''}
                   {investmentAssets.total_daily_pnl.toFixed(2)}
@@ -580,7 +581,7 @@ export function AccountsPage() {
                 </tr></thead>
                 <tbody>{investmentAssets.items.map((item) => (
                   <tr key={item.id} className="border-b last:border-0">
-                    <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}</div></td>
+                    <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}{item.account_name ? ` · ${item.account_name}` : ''}</div></td>
                     <td className="px-2 py-2">{item.quantity}</td>
                     <td className="px-2 py-2">{item.current_price ?? '—'}</td>
                     <td className="px-2 py-2"><Amount value={item.market_value} currency={item.currency} showCurrency /></td>

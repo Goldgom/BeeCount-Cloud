@@ -34,6 +34,7 @@ from ...models import (
     User,
     InvestmentProduct,
 )
+from ...services.investment_accounts import get_investment_account
 from uuid import uuid4
 from ...security import SCOPE_APP_WRITE, _create_token
 from .read_tools import _parse_dt, _resolve_ledger, live_ledgers
@@ -692,6 +693,7 @@ async def delete_account(user: User, *, account_id: str, confirm: bool = False,
 async def create_investment_product(user: User, *, name: str, symbol: str,
                                     quantity: float, cost_basis: float = 0,
                                     currency: str = "CNY", market: str | None = None,
+                                    account_id: str | None = None,
                                     account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
@@ -699,9 +701,10 @@ async def create_investment_product(user: User, *, name: str, symbol: str,
     if quantity < 0 or cost_basis < 0:
         raise ValueError("quantity and cost_basis must be non-negative")
     with SessionLocal() as db:
+        account = _resolve_investment_account(db, user.id, account_id, account_name)
         row = InvestmentProduct(id=str(uuid4()), user_id=user.id, name=name.strip(), symbol=symbol.strip().upper(),
                                 quantity=quantity, cost_basis=cost_basis, currency=currency.strip().upper(),
-                                market=market, account_name=account_name, current_price=current_price,
+                                market=market, account_id=account.sync_id, account_name=account.name,
                                 price_source="manual" if current_price is not None else None,
                                 last_market_close=last_market_close, day_change=day_change)
         db.add(row); db.commit(); db.refresh(row)
@@ -711,7 +714,8 @@ async def create_investment_product(user: User, *, name: str, symbol: str,
 async def update_investment_product(user: User, *, product_id: str, name: str | None = None,
                                     symbol: str | None = None, quantity: float | None = None,
                                     cost_basis: float | None = None, currency: str | None = None,
-                                    market: str | None = None, account_name: str | None = None,
+                                    market: str | None = None, account_id: str | None = None,
+                                    account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
                                     day_change: float | None = None,
@@ -719,13 +723,16 @@ async def update_investment_product(user: User, *, product_id: str, name: str | 
     with SessionLocal() as db:
         row = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
         if row is None: raise ValueError("Investment product not found")
+        if account_id is not None or account_name is not None:
+            account = _resolve_investment_account(db, user.id, account_id, account_name)
+            row.account_id, row.account_name = account.sync_id, account.name
         if use_auto_price:
             row.current_price = None
             row.price_source = None
             row.last_market_close = None
             row.day_change = None
         for key, value in (("name", name), ("symbol", symbol), ("quantity", quantity), ("cost_basis", cost_basis),
-                           ("currency", currency), ("market", market), ("account_name", account_name), ("current_price", current_price),
+                           ("currency", currency), ("market", market), ("current_price", current_price),
                            ("last_market_close", last_market_close), ("day_change", day_change)):
             if value is not None: setattr(row, key, value.upper() if key in {"symbol", "currency"} else value)
         if current_price is not None:
@@ -743,6 +750,23 @@ async def delete_investment_product(user: User, *, product_id: str, confirm: boo
         if row is None: raise ValueError("Investment product not found")
         db.delete(row); db.commit()
     return {"status": "deleted", "id": product_id}
+
+
+def _resolve_investment_account(db: Session, user_id: str, account_id: str | None,
+                                account_name: str | None) -> UserAccountProjection:
+    """Resolve legacy name input to a stable, owned investment-account id."""
+    if not account_id and account_name and account_name.strip():
+        account_id = db.scalar(select(UserAccountProjection.sync_id).where(
+            UserAccountProjection.user_id == user_id,
+            UserAccountProjection.account_type == "investment",
+            UserAccountProjection.name == account_name.strip(),
+        ))
+    if not account_id:
+        raise ValueError("account_id is required and must reference an investment account")
+    account = get_investment_account(db, user_id=user_id, account_id=account_id.strip())
+    if account is None:
+        raise ValueError("account_id must reference one of your investment accounts")
+    return account
 
 
 # ---------- internal helpers ------------------------------------------------

@@ -275,21 +275,26 @@ async def list_accounts(
 
 @mcp.tool()
 async def list_investment_products(ctx: Context) -> list[dict[str, Any]]:
-    """List investment holdings recorded for the authenticated user."""
+    """List holdings and their bound investment ``account_id`` for the authenticated user."""
     return await _logged_call(ctx, name="list_investment_products", scope=SCOPE_MCP_READ, kwargs={},
         body=lambda user: asyncio.to_thread(read_tools.list_investment_products, user))
 
 
 @mcp.tool()
 async def get_investment_product(ctx: Context, product_id: str) -> dict[str, Any] | None:
-    """Get one investment holding by id."""
+    """Get one holding by id, including its bound investment ``account_id``."""
     return await _logged_call(ctx, name="get_investment_product", scope=SCOPE_MCP_READ, kwargs={"product_id": product_id},
         body=lambda user: asyncio.to_thread(read_tools.get_investment_product, user, product_id))
 
 
 @mcp.tool()
 async def get_investment_assets(ctx: Context, refresh: bool = True) -> dict[str, Any]:
-    """Get holdings with latest market prices and total value in primary currency."""
+    """Get investment-account assets.
+
+    Each ``investment_accounts`` entry contains cash_balance, holdings_market_value,
+    total_assets (cash + holdings), daily_pnl and its bound holdings. Set refresh
+    to fetch non-manual quotes. Root totals are retained for summary cards.
+    """
     return await _logged_call(ctx, name="get_investment_assets", scope=SCOPE_MCP_READ, kwargs={"refresh": refresh},
         body=lambda user: read_tools.get_investment_assets(user, refresh=refresh))
 
@@ -395,14 +400,17 @@ async def delete_account(ctx: Context, account_id: str, confirm: bool = False,
 @mcp.tool()
 async def create_investment_product(ctx: Context, name: str, symbol: str, quantity: float,
                                     cost_basis: float = 0, currency: str = "CNY",
-                                    market: str | None = None, account_name: str | None = None,
+                                    market: str | None = None, account_id: str | None = None,
+                                    account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
                                     day_change: float | None = None) -> dict[str, Any]:
-    """Record a holding.
+    """Record a holding bound to one of the user's investment accounts.
 
-    ``cost_basis`` is optional per-unit cost. ``current_price`` is an explicit
-    manual override; leave it blank to use the free quote provider.
+    ``account_id`` is the stable investment-account id and is required. Legacy
+    ``account_name`` is only accepted to resolve an existing investment account;
+    never use it for a new relationship. ``cost_basis`` is per-unit. Supplying
+    ``current_price`` makes it a manual override; omit it for the quote provider.
     """
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="create_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
@@ -413,15 +421,17 @@ async def create_investment_product(ctx: Context, name: str, symbol: str, quanti
 async def update_investment_product(ctx: Context, product_id: str, name: str | None = None,
                                     symbol: str | None = None, quantity: float | None = None,
                                     cost_basis: float | None = None, currency: str | None = None,
-                                    market: str | None = None, account_name: str | None = None,
+                                    market: str | None = None, account_id: str | None = None,
+                                    account_name: str | None = None,
                                     current_price: float | None = None,
                                     last_market_close: float | None = None,
                                     day_change: float | None = None,
                                     use_auto_price: bool = False) -> dict[str, Any]:
-    """Update holding; current_price is manual when supplied, otherwise auto quote.
+    """Update a holding, including moving it to a different investment account.
 
     Set ``use_auto_price=true`` to clear a manual price and resume the free
-    market-data provider. ``cost_basis`` is optional per-unit cost.
+    market-data provider. ``account_id`` is the preferred stable binding;
+    ``account_name`` is legacy lookup only. ``cost_basis`` is per-unit cost.
     """
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="update_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,

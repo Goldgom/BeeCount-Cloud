@@ -33,6 +33,7 @@ from ...models import (
 # 复用 read 端的唯一权威"软删除"判定 —— 保证 MCP 与 web/mobile 账本可见性口径
 # 一致(issue #31)。read._shared 不依赖 mcp,无循环 import。
 from ...routers.read._shared import _is_ledger_deleted
+from ...services.investment_accounts import investment_account_cash_balances
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -272,7 +273,7 @@ def list_accounts(user: User, *, account_type: str | None = None) -> list[dict[s
 
 
 async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str, Any]:
-    """Return holdings, latest prices and total market value in base currency."""
+    """Return holdings and each investment account's cash + holding assets."""
     from ...services.investment_price import fetch_price
     from ...services.exchange_rate import fetcher
     with SessionLocal() as db:
@@ -281,6 +282,10 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
         items: list[dict[str, Any]] = []
         total = 0.0
         total_daily_pnl = 0.0
+        account_values = investment_account_cash_balances(db, user_id=user.id)
+        account_items: dict[str, list[dict[str, Any]]] = {key: [] for key in account_values}
+        account_market_values = {key: 0.0 for key in account_values}
+        account_daily_pnls = {key: 0.0 for key in account_values}
         for row in rows:
             price = row.current_price
             source = row.price_source or "manual"
@@ -311,24 +316,43 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                 except Exception:
                     native = value
             total += native
-            items.append({"id": row.id, "name": row.name, "symbol": row.symbol, "market": row.market,
-                          "currency": ccy, "account_name": row.account_name, "quantity": row.quantity,
+            item = {"id": row.id, "name": row.name, "symbol": row.symbol, "market": row.market,
+                          "currency": ccy, "account_id": row.account_id, "account_name": row.account_name, "quantity": row.quantity,
                           "cost_basis": row.cost_basis, "price": price, "price_source": source,
                           "price_mode": "manual" if source == "manual" else "auto",
                           "last_market_close": last_close, "day_change": day_change,
                           "cost_basis_total": round(float(row.cost_basis or 0), 2),
                           "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,
                           "market_value": round(value, 2), "market_value_base": round(native, 2),
-                          "daily_pnl": round(daily_pnl, 2), "holding_pnl": round(holding_pnl, 2)})
+                          "daily_pnl": round(daily_pnl, 2), "holding_pnl": round(holding_pnl, 2)}
+            items.append(item)
+            if row.account_id in account_values:
+                account_items[row.account_id].append(item)
+                account_market_values[row.account_id] += value
+                account_daily_pnls[row.account_id] += daily_pnl
+        investment_accounts = [
+            {
+                **data,
+                "cash_balance": round(float(data["cash_balance"]), 2),
+                "holdings_market_value": round(account_market_values[account_id], 2),
+                "total_assets": round(float(data["cash_balance"]) + account_market_values[account_id], 2),
+                "daily_pnl": round(account_daily_pnls[account_id], 2),
+                "items": account_items[account_id],
+            }
+            for account_id, data in account_values.items()
+        ]
+        total_cash = sum(float(data["cash_balance"]) for data in account_values.values())
         return {"base_currency": profile_currency, "total_market_value": round(total, 2),
-                "total_daily_pnl": round(total_daily_pnl, 2), "items": items}
+                "total_daily_pnl": round(total_daily_pnl, 2), "total_cash_balance": round(total_cash, 2),
+                "total_assets": round(total + total_cash, 2), "investment_accounts": investment_accounts,
+                "items": items}
 
 
 def list_investment_products(user: User) -> list[dict[str, Any]]:
     with SessionLocal() as db:
         rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == user.id).order_by(InvestmentProduct.name)).all()
         return [{"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
-                 "currency": r.currency, "account_name": r.account_name,
+                 "currency": r.currency, "account_id": r.account_id, "account_name": r.account_name,
                  "quantity": r.quantity, "cost_basis": r.cost_basis,
                  "current_price": r.current_price,
                  "price_mode": "manual" if r.price_source == "manual" else "auto",
@@ -343,7 +367,7 @@ def get_investment_product(user: User, product_id: str) -> dict[str, Any] | None
         if r is None:
             return None
         return {"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
-                "currency": r.currency, "account_name": r.account_name, "quantity": r.quantity,
+                "currency": r.currency, "account_id": r.account_id, "account_name": r.account_name, "quantity": r.quantity,
                 "cost_basis": r.cost_basis, "current_price": r.current_price,
                 "price_mode": "manual" if r.price_source == "manual" else "auto",
                 "last_market_close": r.last_market_close, "day_change": r.day_change,

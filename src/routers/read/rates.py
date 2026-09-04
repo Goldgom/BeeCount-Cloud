@@ -11,6 +11,7 @@ from ...database import get_db
 from ...deps import get_current_user
 from ...models import User, UserExchangeRateProjection, UserProfile
 from ...models import InvestmentProduct
+from ...services.investment_accounts import investment_account_cash_balances
 from ...routers.pats import _utc_iso  # SQLite naive-datetime 坑,同 pats.py:75-87
 from ...services.exchange_rate import fetcher
 from ._shared import _READ_SCOPE_DEP, router
@@ -65,6 +66,7 @@ class InvestmentHoldingOut(BaseModel):
     symbol: str
     market: str | None = None
     currency: str
+    account_id: str | None = None
     account_name: str | None = None
     quantity: float
     cost_basis: float
@@ -77,10 +79,25 @@ class InvestmentHoldingOut(BaseModel):
     holding_pnl: float
 
 
+class InvestmentAccountAssetsOut(BaseModel):
+    account_id: str
+    account_name: str
+    currency: str
+    cash_balance: float
+    holdings_market_value: float
+    total_assets: float
+    daily_pnl: float
+    items: list[InvestmentHoldingOut]
+
+
 class InvestmentAssetsOut(BaseModel):
     base_currency: str
+    # Kept for existing clients: value of holdings only.
     total_market_value: float
     total_daily_pnl: float
+    total_cash_balance: float
+    total_assets: float
+    investment_accounts: list[InvestmentAccountAssetsOut]
     items: list[InvestmentHoldingOut]
 
 
@@ -94,8 +111,12 @@ async def get_investment_assets(
     from ...services.investment_price import fetch_price
     rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == current_user.id).order_by(InvestmentProduct.name)).all()
     base_currency = db.scalar(select(UserProfile.primary_currency).where(UserProfile.user_id == current_user.id)) or "CNY"
-    items = []
+    items: list[InvestmentHoldingOut] = []
     total = total_pnl = 0.0
+    account_values = investment_account_cash_balances(db, user_id=current_user.id)
+    account_items: dict[str, list[InvestmentHoldingOut]] = {key: [] for key in account_values}
+    account_market_values = {key: 0.0 for key in account_values}
+    account_daily_pnls = {key: 0.0 for key in account_values}
     for row in rows:
         price, previous_close, day_change = row.current_price, row.last_market_close, row.day_change
         if refresh and row.price_source != "manual":
@@ -116,17 +137,38 @@ async def get_investment_assets(
         holding_pnl = float(row.quantity or 0) * (float(price or 0) - float(row.cost_basis or 0)) if price is not None else 0.0
         total += value
         total_pnl += pnl
-        items.append(InvestmentHoldingOut(
+        item = InvestmentHoldingOut(
             id=row.id, name=row.name, symbol=row.symbol, market=row.market,
-            currency=row.currency, account_name=row.account_name,
+            currency=row.currency, account_id=row.account_id, account_name=row.account_name,
             quantity=float(row.quantity or 0), cost_basis=float(row.cost_basis or 0),
             current_price=price, last_market_close=previous_close, day_change=day_change,
             price_mode="manual" if row.price_source == "manual" else "auto",
             market_value=round(value, 2), daily_pnl=round(pnl, 2),
             holding_pnl=round(holding_pnl, 2),
-        ))
-    return InvestmentAssetsOut(base_currency=base_currency, total_market_value=round(total, 2),
-                               total_daily_pnl=round(total_pnl, 2), items=items)
+        )
+        items.append(item)
+        if row.account_id in account_values:
+            account_items[row.account_id].append(item)
+            account_market_values[row.account_id] += value
+            account_daily_pnls[row.account_id] += pnl
+    accounts = [
+        InvestmentAccountAssetsOut(
+            account_id=account_id,
+            account_name=str(data["account_name"]), currency=str(data["currency"]),
+            cash_balance=round(float(data["cash_balance"]), 2),
+            holdings_market_value=round(account_market_values[account_id], 2),
+            total_assets=round(float(data["cash_balance"]) + account_market_values[account_id], 2),
+            daily_pnl=round(account_daily_pnls[account_id], 2),
+            items=account_items[account_id],
+        )
+        for account_id, data in account_values.items()
+    ]
+    total_cash = sum(float(item["cash_balance"]) for item in account_values.values())
+    return InvestmentAssetsOut(
+        base_currency=base_currency, total_market_value=round(total, 2), total_daily_pnl=round(total_pnl, 2),
+        total_cash_balance=round(total_cash, 2), total_assets=round(total_cash + total, 2),
+        investment_accounts=accounts, items=items,
+    )
 
 
 @router.get("/exchange-rates", response_model=ExchangeRatesOut)
