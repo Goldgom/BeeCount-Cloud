@@ -28,7 +28,7 @@ def list_ledgers(
 ) -> list[ReadLedgerOut]:
     # 共享账本 Phase 1:走 LedgerMember 表拿 caller 能访问的全部 ledger(含
     # 自己 owner 的 + 加入的共享账本)。admin 用户直接看所有(管理后台需求)。
-    from ...ledger_access import list_accessible_memberships, count_ledger_members
+    from ...ledger_access import list_accessible_memberships
 
     if _is_admin(current_user):
         rows = list(db.scalars(select(Ledger).order_by(Ledger.created_at.desc())).all())
@@ -36,18 +36,24 @@ def list_ledgers(
     else:
         memberships = list_accessible_memberships(db, user_id=current_user.id)
 
+    ledger_ids = {ledger.id for ledger, _role in memberships}
+    deleted_ids = _deleted_ledger_ids(db, ledger_ids)
+    totals_by_ledger = _projection_totals_for_ledgers(db, ledger_ids)
+    member_counts = _member_counts_for_ledgers(db, ledger_ids)
     out: list[ReadLedgerOut] = []
     for ledger, role in memberships:
         # Hide soft-deleted ledgers.
-        if _is_ledger_deleted(db, ledger_id=ledger.id):
+        if ledger.id in deleted_ids:
             continue
         # currency 暂不做 projection 化 —— 顶层元数据非热点,snapshot_cache 命中
         # 后 ~1ms,偶发 cold miss 50ms 可接受;list_ledgers 本身调用频率低。
         currency = ledger.currency or "CNY"
         ledger_name = _resolve_ledger_name(db, ledger=ledger)
-        tx_count, income_total, expense_total, balance_all, _ = _projection_totals(db, ledger.id)
+        tx_count, income_total, expense_total, balance_all = totals_by_ledger.get(
+            ledger.id, (0, 0.0, 0.0, 0.0)
+        )
         now = datetime.now(timezone.utc)
-        member_count = count_ledger_members(db, ledger_id=ledger.id)
+        member_count = member_counts.get(ledger.id, 0)
         effective_role = role or ("owner" if ledger.user_id == current_user.id else "viewer")
         out.append(
             ReadLedgerOut(

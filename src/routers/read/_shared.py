@@ -262,6 +262,35 @@ def _is_ledger_deleted(db: Session, *, ledger_id: str) -> bool:
     return latest_action == "delete"
 
 
+def _deleted_ledger_ids(db: Session, ledger_ids: set[str]) -> set[str]:
+    """Return ledgers whose *latest* snapshot change is a tombstone.
+
+    Workspace/list endpoints often inspect many ledgers at once.  Calling
+    ``_is_ledger_deleted`` in a loop creates one query per ledger; this single
+    window query keeps the read path bounded as a user accumulates ledgers.
+    """
+    if not ledger_ids:
+        return set()
+    ranked = select(
+        SyncChange.ledger_id,
+        SyncChange.action,
+        func.row_number().over(
+            partition_by=SyncChange.ledger_id,
+            order_by=SyncChange.change_id.desc(),
+        ).label("rn"),
+    ).where(
+        SyncChange.ledger_id.in_(ledger_ids),
+        SyncChange.entity_type == "ledger_snapshot",
+    ).subquery()
+    rows = db.execute(
+        select(ranked.c.ledger_id).where(
+            ranked.c.rn == 1,
+            ranked.c.action == "delete",
+        )
+    ).all()
+    return {str(row[0]) for row in rows}
+
+
 def _visible_workspace_ledgers(
     db: Session,
     *,
@@ -300,7 +329,8 @@ def _visible_workspace_ledgers(
             select(Ledger).where(and_(*conditions) if conditions else true())
         ).scalars().all()
     )
-    return [lg for lg in ledgers if not _is_ledger_deleted(db, ledger_id=lg.id)]
+    deleted_ids = _deleted_ledger_ids(db, {lg.id for lg in ledgers})
+    return [lg for lg in ledgers if lg.id not in deleted_ids]
 
 
 def _snapshot_ledger_info(
@@ -478,6 +508,61 @@ def _projection_totals(
         float(balance_all or 0),
         _to_utc(latest_raw) if latest_raw else None,
     )
+
+
+def _projection_totals_for_ledgers(
+    db: Session, ledger_ids: set[str]
+) -> dict[str, tuple[int, float, float, float]]:
+    """Batch variant of ``_projection_totals`` for list endpoints.
+
+    Aggregating all requested ledgers in one query avoids four round trips per
+    ledger when rendering the ledger list, while preserving the same excluded
+    stats and multi-currency semantics as the single-ledger helper.
+    """
+    if not ledger_ids:
+        return {}
+    from sqlalchemy import case as sa_case
+    from sqlalchemy import false as sa_false
+
+    native = func.coalesce(ReadTxProjection.native_amount, ReadTxProjection.amount)
+    counted = ReadTxProjection.exclude_from_stats == sa_false()
+    rows = db.execute(
+        select(
+            ReadTxProjection.ledger_id,
+            func.count(ReadTxProjection.sync_id),
+            func.coalesce(func.sum(
+                sa_case(((ReadTxProjection.tx_type == "income") & counted, native), else_=0.0)
+            ), 0.0),
+            func.coalesce(func.sum(
+                sa_case(((ReadTxProjection.tx_type == "expense") & counted, native), else_=0.0)
+            ), 0.0),
+            func.coalesce(func.sum(
+                sa_case(
+                    (ReadTxProjection.tx_type == "income", native),
+                    (ReadTxProjection.tx_type == "expense", -native),
+                    else_=0.0,
+                )
+            ), 0.0),
+        )
+        .where(ReadTxProjection.ledger_id.in_(ledger_ids))
+        .group_by(ReadTxProjection.ledger_id)
+    ).all()
+    return {
+        str(ledger_id): (int(count or 0), float(income or 0), float(expense or 0), float(balance or 0))
+        for ledger_id, count, income, expense, balance in rows
+    }
+
+
+def _member_counts_for_ledgers(db: Session, ledger_ids: set[str]) -> dict[str, int]:
+    """Batch member counts used by ``GET /read/ledgers``."""
+    if not ledger_ids:
+        return {}
+    rows = db.execute(
+        select(LedgerMember.ledger_id, func.count(LedgerMember.user_id))
+        .where(LedgerMember.ledger_id.in_(ledger_ids))
+        .group_by(LedgerMember.ledger_id)
+    ).all()
+    return {str(ledger_id): int(count or 0) for ledger_id, count in rows}
 
 
 def _clamp_month_start_day(value: int | None) -> int:
@@ -705,6 +790,8 @@ __all__ = [
     '_tags_list',
     '_to_utc',
     '_projection_totals',
+    '_projection_totals_for_ledgers',
+    '_member_counts_for_ledgers',
     '_bucket_key',
     '_analytics_range',
     '_csv_field',

@@ -128,6 +128,7 @@ class Settings(BaseSettings):
     # 整体替换内置上游链,指向 Frankfurter 兼容服务的根地址(如自托管
     # `docker run -d -p 8080:8080 lineofflight/frankfurter` → http://host:8080)。
     exchange_rate_upstream: str = Field(default="", alias="EXCHANGE_RATE_UPSTREAM")
+    investment_price_url: str = Field(default="", alias="INVESTMENT_PRICE_URL")
 
     @property
     def cors_origin_list(self) -> list[str]:

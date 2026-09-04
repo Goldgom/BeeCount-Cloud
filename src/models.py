@@ -602,6 +602,36 @@ class UserAccountProjection(Base):
     )
 
 
+class InvestmentProduct(Base):
+    """User-owned investment holding.
+
+    Holdings deliberately live outside the mobile snapshot schema so that MCP
+    and the web API can evolve independently.  ``quantity`` and ``cost_basis``
+    are the user's position; ``current_price`` is the last known quote and is
+    refreshed lazily by the price service.
+    """
+
+    __tablename__ = "investment_products"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    market: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    currency: Mapped[str] = mapped_column(String(16), default="CNY", server_default="CNY")
+    account_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    quantity: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_basis: Mapped[float] = mapped_column(Float, default=0.0)
+    current_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    price_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+Index("ix_investment_products_user_symbol", InvestmentProduct.user_id, InvestmentProduct.symbol)
+
+
 class UserExchangeRateProjection(Base):
     """手动汇率 override 的 user-scope projection(Q-side)。
 

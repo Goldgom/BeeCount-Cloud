@@ -274,6 +274,27 @@ async def list_accounts(
 
 
 @mcp.tool()
+async def list_investment_products(ctx: Context) -> list[dict[str, Any]]:
+    """List investment holdings recorded for the authenticated user."""
+    return await _logged_call(ctx, name="list_investment_products", scope=SCOPE_MCP_READ, kwargs={},
+        body=lambda user: asyncio.to_thread(read_tools.list_investment_products, user))
+
+
+@mcp.tool()
+async def get_investment_product(ctx: Context, product_id: str) -> dict[str, Any] | None:
+    """Get one investment holding by id."""
+    return await _logged_call(ctx, name="get_investment_product", scope=SCOPE_MCP_READ, kwargs={"product_id": product_id},
+        body=lambda user: asyncio.to_thread(read_tools.get_investment_product, user, product_id))
+
+
+@mcp.tool()
+async def get_investment_assets(ctx: Context, refresh: bool = True) -> dict[str, Any]:
+    """Get holdings with latest market prices and total value in primary currency."""
+    return await _logged_call(ctx, name="get_investment_assets", scope=SCOPE_MCP_READ, kwargs={"refresh": refresh},
+        body=lambda user: read_tools.get_investment_assets(user, refresh=refresh))
+
+
+@mcp.tool()
 async def list_tags(ctx: Context) -> list[dict[str, Any]]:
     """List all of the user's tags."""
     return await _logged_call(
@@ -337,6 +358,69 @@ async def search(ctx: Context, q: str, limit: int = 20) -> list[dict[str, Any]]:
 # ============================================================================
 # Write tools — 7 个,mcp:write scope
 # ============================================================================
+
+
+@mcp.tool()
+async def create_account(ctx: Context, name: str, account_type: str | None = None,
+                         currency: str | None = None, initial_balance: float = 0,
+                         note: str | None = None, ledger_id: str | None = None) -> dict[str, Any]:
+    """Create a wallet/account. Account names are user-global."""
+    kw = {"name": name, "account_type": account_type, "currency": currency,
+          "initial_balance": initial_balance, "note": note, "ledger_id": ledger_id}
+    return await _logged_call(ctx, name="create_account", scope=SCOPE_MCP_WRITE, kwargs=kw,
+        body=lambda user: write_tools.create_account(user, **kw))
+
+
+@mcp.tool()
+async def update_account(ctx: Context, account_id: str, name: str | None = None,
+                         account_type: str | None = None, currency: str | None = None,
+                         initial_balance: float | None = None, note: str | None = None,
+                         ledger_id: str | None = None) -> dict[str, Any]:
+    """Update wallet/account fields by id."""
+    kw = {"account_id": account_id, "name": name, "account_type": account_type,
+          "currency": currency, "initial_balance": initial_balance, "note": note, "ledger_id": ledger_id}
+    return await _logged_call(ctx, name="update_account", scope=SCOPE_MCP_WRITE, kwargs=kw,
+        body=lambda user: write_tools.update_account(user, **kw))
+
+
+@mcp.tool()
+async def delete_account(ctx: Context, account_id: str, confirm: bool = False,
+                         ledger_id: str | None = None) -> dict[str, Any]:
+    """Delete an account; requires explicit confirm=true."""
+    kw = {"account_id": account_id, "confirm": confirm, "ledger_id": ledger_id}
+    return await _logged_call(ctx, name="delete_account", scope=SCOPE_MCP_WRITE, kwargs=kw,
+        body=lambda user: write_tools.delete_account(user, **kw))
+
+
+@mcp.tool()
+async def create_investment_product(ctx: Context, name: str, symbol: str, quantity: float,
+                                    cost_basis: float = 0, currency: str = "CNY",
+                                    market: str | None = None, account_name: str | None = None,
+                                    current_price: float | None = None) -> dict[str, Any]:
+    """Record an investment product/holding."""
+    kw = locals().copy(); kw.pop("ctx")
+    return await _logged_call(ctx, name="create_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
+        body=lambda user: write_tools.create_investment_product(user, **kw))
+
+
+@mcp.tool()
+async def update_investment_product(ctx: Context, product_id: str, name: str | None = None,
+                                    symbol: str | None = None, quantity: float | None = None,
+                                    cost_basis: float | None = None, currency: str | None = None,
+                                    market: str | None = None, account_name: str | None = None,
+                                    current_price: float | None = None) -> dict[str, Any]:
+    """Update an investment holding."""
+    kw = locals().copy(); kw.pop("ctx")
+    return await _logged_call(ctx, name="update_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
+        body=lambda user: write_tools.update_investment_product(user, **kw))
+
+
+@mcp.tool()
+async def delete_investment_product(ctx: Context, product_id: str, confirm: bool = False) -> dict[str, Any]:
+    """Delete an investment holding; requires explicit confirmation."""
+    kw = {"product_id": product_id, "confirm": confirm}
+    return await _logged_call(ctx, name="delete_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
+        body=lambda user: write_tools.delete_investment_product(user, **kw))
 
 
 @mcp.tool()

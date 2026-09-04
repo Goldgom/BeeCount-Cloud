@@ -32,7 +32,9 @@ from ...models import (
     UserExchangeRateProjection,
     UserTagProjection,
     User,
+    InvestmentProduct,
 )
+from uuid import uuid4
 from ...security import SCOPE_APP_WRITE, _create_token
 from .read_tools import _parse_dt, _resolve_ledger, live_ledgers
 
@@ -636,6 +638,95 @@ async def parse_and_create_from_text(
         currency=currency,
     )
     return {"status": "created", "parsed": draft, "transaction": created}
+
+
+async def create_account(user: User, *, name: str, account_type: str | None = None,
+                         currency: str | None = None, initial_balance: float = 0,
+                         note: str | None = None, ledger_id: str | None = None) -> dict[str, Any]:
+    """Create an account through the canonical snapshot write endpoint."""
+    with SessionLocal() as db:
+        led, status = _resolve_write_ledger(db, user, ledger_id)
+        if status:
+            return status
+        assert led is not None
+        ext = led.external_id
+    body = {"base_change_id": 0, "name": name, "account_type": account_type,
+            "currency": currency, "initial_balance": initial_balance, "note": note}
+    body = {k: v for k, v in body.items() if v is not None}
+    result = await _self_call("POST", f"{get_settings().api_prefix}/write/ledgers/{ext}/accounts", user, json=body)
+    return {"status": "created", "id": result.get("entity_id"), "name": name, "_meta": result}
+
+
+async def update_account(user: User, *, account_id: str, name: str | None = None,
+                         account_type: str | None = None, currency: str | None = None,
+                         initial_balance: float | None = None, note: str | None = None,
+                         ledger_id: str | None = None) -> dict[str, Any]:
+    with SessionLocal() as db:
+        led, status = _resolve_write_ledger(db, user, ledger_id)
+        if status:
+            return status
+        assert led is not None
+        ext = led.external_id
+    body = {"base_change_id": 0, "name": name, "account_type": account_type,
+            "currency": currency, "initial_balance": initial_balance, "note": note}
+    body = {k: v for k, v in body.items() if v is not None}
+    result = await _self_call("PATCH", f"{get_settings().api_prefix}/write/ledgers/{ext}/accounts/{account_id}", user, json=body)
+    return {"status": "updated", "id": account_id, "_meta": result}
+
+
+async def delete_account(user: User, *, account_id: str, confirm: bool = False,
+                         ledger_id: str | None = None) -> dict[str, Any]:
+    if not confirm:
+        return {"status": "confirmation_required", "id": account_id,
+                "message": "Re-call with confirm=true after explicit user approval."}
+    with SessionLocal() as db:
+        led, status = _resolve_write_ledger(db, user, ledger_id)
+        if status:
+            return status
+        assert led is not None
+        ext = led.external_id
+    result = await _self_call("DELETE", f"{get_settings().api_prefix}/write/ledgers/{ext}/accounts/{account_id}", user, json={"base_change_id": 0})
+    return {"status": "deleted", "id": account_id, "_meta": result}
+
+
+async def create_investment_product(user: User, *, name: str, symbol: str,
+                                    quantity: float, cost_basis: float = 0,
+                                    currency: str = "CNY", market: str | None = None,
+                                    account_name: str | None = None,
+                                    current_price: float | None = None) -> dict[str, Any]:
+    if quantity < 0 or cost_basis < 0:
+        raise ValueError("quantity and cost_basis must be non-negative")
+    with SessionLocal() as db:
+        row = InvestmentProduct(id=str(uuid4()), user_id=user.id, name=name.strip(), symbol=symbol.strip().upper(),
+                                quantity=quantity, cost_basis=cost_basis, currency=currency.strip().upper(),
+                                market=market, account_name=account_name, current_price=current_price,
+                                price_source="manual" if current_price is not None else None)
+        db.add(row); db.commit(); db.refresh(row)
+        return {"status": "created", "id": row.id, "name": row.name, "symbol": row.symbol}
+
+
+async def update_investment_product(user: User, *, product_id: str, name: str | None = None,
+                                    symbol: str | None = None, quantity: float | None = None,
+                                    cost_basis: float | None = None, currency: str | None = None,
+                                    market: str | None = None, account_name: str | None = None,
+                                    current_price: float | None = None) -> dict[str, Any]:
+    with SessionLocal() as db:
+        row = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
+        if row is None: raise ValueError("Investment product not found")
+        for key, value in (("name", name), ("symbol", symbol), ("quantity", quantity), ("cost_basis", cost_basis),
+                           ("currency", currency), ("market", market), ("account_name", account_name), ("current_price", current_price)):
+            if value is not None: setattr(row, key, value.upper() if key in {"symbol", "currency"} else value)
+        row.updated_at = datetime.now(timezone.utc); db.commit()
+        return {"status": "updated", "id": row.id}
+
+
+async def delete_investment_product(user: User, *, product_id: str, confirm: bool = False) -> dict[str, Any]:
+    if not confirm: return {"status": "confirmation_required", "id": product_id}
+    with SessionLocal() as db:
+        row = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
+        if row is None: raise ValueError("Investment product not found")
+        db.delete(row); db.commit()
+    return {"status": "deleted", "id": product_id}
 
 
 # ---------- internal helpers ------------------------------------------------

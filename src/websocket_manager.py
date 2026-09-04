@@ -1,7 +1,9 @@
+import asyncio
 import json
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
+from threading import Lock
 
 from fastapi import WebSocket
 
@@ -11,29 +13,57 @@ logger = logging.getLogger(__name__)
 
 
 class WSConnectionManager:
-    def __init__(self) -> None:
+    """Track active websocket connections and fan out events efficiently.
+
+    The connection map is touched by websocket handlers and by background
+    tasks (backup/sync notifications).  Taking a short lock while copying the
+    target set keeps iteration safe; network I/O is deliberately performed
+    after releasing the lock so a slow client cannot block connect/disconnect
+    operations for other users.
+    """
+
+    def __init__(self, *, send_timeout: float = 10.0) -> None:
         self._connections: dict[str, set[WebSocket]] = defaultdict(set)
+        self._lock = Lock()
+        self._send_timeout = send_timeout
 
     async def connect(self, user_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
-        self._connections[user_id].add(websocket)
-        metrics.set_gauge("beecount_online_ws_users", float(len(self._connections)))
+        with self._lock:
+            self._connections[user_id].add(websocket)
+            user_count = len(self._connections)
+        metrics.set_gauge("beecount_online_ws_users", float(user_count))
 
     def disconnect(self, user_id: str, websocket: WebSocket) -> None:
-        if user_id in self._connections:
-            self._connections[user_id].discard(websocket)
-            if not self._connections[user_id]:
-                del self._connections[user_id]
-        metrics.set_gauge("beecount_online_ws_users", float(len(self._connections)))
+        with self._lock:
+            connections = self._connections.get(user_id)
+            if connections is not None:
+                connections.discard(websocket)
+                if not connections:
+                    del self._connections[user_id]
+            user_count = len(self._connections)
+        metrics.set_gauge("beecount_online_ws_users", float(user_count))
 
     async def broadcast_to_user(self, user_id: str, payload: dict) -> None:
-        stale: list[WebSocket] = []
-        conns = self._connections.get(user_id, set())
-        for ws in conns:
+        # Copy the set while holding the lock.  A websocket disconnecting in
+        # another task must not mutate the collection being iterated.
+        with self._lock:
+            conns = tuple(self._connections.get(user_id, ()))
+
+        message = json.dumps(payload, ensure_ascii=False, default=str)
+
+        async def _send(ws: WebSocket) -> tuple[WebSocket, bool]:
             try:
-                await ws.send_text(json.dumps(payload, ensure_ascii=False, default=str))
+                # A dead/paused client should not hold up fan-out forever.
+                await asyncio.wait_for(ws.send_text(message), timeout=self._send_timeout)
+                return ws, False
             except Exception:
-                stale.append(ws)
+                return ws, True
+
+        # Sending concurrently bounds broadcast latency by the slowest active
+        # socket rather than the sum of all socket latencies.
+        results = await asyncio.gather(*(_send(ws) for ws in conns)) if conns else ()
+        stale = [ws for ws, failed in results if failed]
 
         if conns:
             logger.info(
@@ -44,11 +74,24 @@ class WSConnectionManager:
                 len(stale),
             )
 
-        for ws in stale:
-            self.disconnect(user_id, ws)
+        if stale:
+            with self._lock:
+                current = self._connections.get(user_id)
+                if current is not None:
+                    for ws in stale:
+                        current.discard(ws)
+                    if not current:
+                        del self._connections[user_id]
+                    user_count = len(self._connections)
+                else:
+                    user_count = len(self._connections)
+            metrics.set_gauge("beecount_online_ws_users", float(user_count))
 
     def online_user_ids(self) -> Iterable[str]:
-        return self._connections.keys()
+        # Return a stable snapshot; exposing the live dict view allowed callers
+        # to observe RuntimeError when a connection changed during iteration.
+        with self._lock:
+            return tuple(self._connections.keys())
 
 
 async def broadcast_to_ledger(

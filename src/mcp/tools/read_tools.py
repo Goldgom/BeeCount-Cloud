@@ -27,6 +27,8 @@ from ...models import (
     UserAccountProjection,
     UserCategoryProjection,
     UserTagProjection,
+    InvestmentProduct,
+    UserProfile,
 )
 # 复用 read 端的唯一权威"软删除"判定 —— 保证 MCP 与 web/mobile 账本可见性口径
 # 一致(issue #31)。read._shared 不依赖 mcp,无循环 import。
@@ -241,12 +243,24 @@ def list_accounts(user: User, *, account_type: str | None = None) -> list[dict[s
         for r in rows:
             if r.sync_id not in seen:
                 seen[r.sync_id] = r
+        # Balance is derived from the transaction projection and initial value.
+        balances: dict[str, float] = {r.name or "": float(r.initial_balance or 0) for r in seen.values()}
+        txs = db.scalars(select(ReadTxProjection).where(ReadTxProjection.user_id == user.id)).all()
+        for tx in txs:
+            if tx.account_name in balances:
+                balances[tx.account_name] += float(tx.amount or 0) * (1 if tx.tx_type == "income" else -1 if tx.tx_type == "expense" else 0)
+            if tx.from_account_name in balances:
+                balances[tx.from_account_name] -= float(tx.amount or 0)
+            if tx.to_account_name in balances:
+                balances[tx.to_account_name] += float(tx.amount or 0)
         return [
             {
                 "name": r.name,
                 "account_type": r.account_type,
                 "currency": r.currency,
                 "initial_balance": float(r.initial_balance or 0),
+                "balance": round(balances.get(r.name or "", 0.0), 2),
+                "id": r.sync_id,
                 "bank_name": r.bank_name,
                 "card_last_four": r.card_last_four,
                 "credit_limit": float(r.credit_limit) if r.credit_limit is not None else None,
@@ -255,6 +269,66 @@ def list_accounts(user: User, *, account_type: str | None = None) -> list[dict[s
             }
             for r in sorted(seen.values(), key=lambda r: (r.name or "").lower())
         ]
+
+
+async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str, Any]:
+    """Return holdings, latest prices and total market value in base currency."""
+    from ...services.investment_price import fetch_price
+    from ...services.exchange_rate import fetcher
+    with SessionLocal() as db:
+        rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == user.id).order_by(InvestmentProduct.name)).all()
+        profile_currency = db.scalar(select(UserProfile.primary_currency).where(UserProfile.user_id == user.id)) or "CNY"
+        items: list[dict[str, Any]] = []
+        total = 0.0
+        for row in rows:
+            price = row.current_price
+            source = row.price_source or "manual"
+            if refresh:
+                try:
+                    price, source = await fetch_price(row.symbol, row.market)
+                    row.current_price, row.price_source, row.price_updated_at = price, source, datetime.now(timezone.utc)
+                    db.commit()
+                except Exception:
+                    pass
+            value = float(row.quantity or 0) * float(price or 0)
+            native = value
+            ccy = (row.currency or profile_currency).upper()
+            if ccy != profile_currency:
+                try:
+                    rate_row, _ = await fetcher.get_rates(db, profile_currency)
+                    rate = float(dict(rate_row.payload_json).get(ccy, 0) or 0)
+                    native = value / rate if rate > 0 else value
+                except Exception:
+                    native = value
+            total += native
+            items.append({"id": row.id, "name": row.name, "symbol": row.symbol, "market": row.market,
+                          "currency": ccy, "account_name": row.account_name, "quantity": row.quantity,
+                          "cost_basis": row.cost_basis, "price": price, "price_source": source,
+                          "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,
+                          "market_value": round(value, 2), "market_value_base": round(native, 2)})
+        return {"base_currency": profile_currency, "total_market_value": round(total, 2), "items": items}
+
+
+def list_investment_products(user: User) -> list[dict[str, Any]]:
+    with SessionLocal() as db:
+        rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == user.id).order_by(InvestmentProduct.name)).all()
+        return [{"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
+                 "currency": r.currency, "account_name": r.account_name,
+                 "quantity": r.quantity, "cost_basis": r.cost_basis,
+                 "current_price": r.current_price,
+                 "price_updated_at": r.price_updated_at.isoformat() if r.price_updated_at else None} for r in rows]
+
+
+def get_investment_product(user: User, product_id: str) -> dict[str, Any] | None:
+    with SessionLocal() as db:
+        r = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
+        if r is None:
+            return None
+        return {"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
+                "currency": r.currency, "account_name": r.account_name, "quantity": r.quantity,
+                "cost_basis": r.cost_basis, "current_price": r.current_price,
+                "price_source": r.price_source,
+                "price_updated_at": r.price_updated_at.isoformat() if r.price_updated_at else None}
 
 
 def list_tags(user: User) -> list[dict[str, Any]]:
