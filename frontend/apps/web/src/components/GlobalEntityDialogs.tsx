@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import {
   fetchWorkspaceTags,
   fetchWorkspaceTransactions,
+  fetchInvestmentAssets,
+  type InvestmentAssetsResponse,
   type WorkspaceAccount,
   type WorkspaceCategory,
   type WorkspaceTag,
@@ -62,6 +64,7 @@ export function GlobalEntityDialogs() {
   const [accountTotal, setAccountTotal] = useState(0)
   const [accountOffset, setAccountOffset] = useState(0)
   const [accountLoading, setAccountLoading] = useState(false)
+  const [investmentAssets, setInvestmentAssets] = useState<InvestmentAssetsResponse | null>(null)
 
   const [category, setCategory] = useState<WorkspaceCategory | null>(null)
   const [categoryScope, setCategoryScope] = useState<DetailScope>('current')
@@ -129,6 +132,13 @@ export function GlobalEntityDialogs() {
       setAccountTotal(0)
       setAccountOffset(0)
       void loadAccountTxs(acc.name, defaultScope, 0)
+      // Investment holdings are account-id bound, so fetch once for the detail
+      // dialog and select by the stable account id at render time.
+      if (acc.account_type === 'investment') {
+        void fetchInvestmentAssets(token, false).then(setInvestmentAssets).catch(() => setInvestmentAssets(null))
+      } else {
+        setInvestmentAssets(null)
+      }
       // 同时拉一份 tags 字典(如还没拉)
       if (tagsDict.length === 0) {
         void fetchWorkspaceTags(token, { limit: 500 }).then(setTagsDict).catch(() => undefined)
@@ -328,6 +338,7 @@ export function GlobalEntityDialogs() {
         total={accountTotal}
         offset={accountOffset}
         loading={accountLoading}
+        investmentAccount={investmentAssets?.investment_accounts.find((item) => item.account_id === account?.id) ?? null}
         tags={tagsDict}
         onClose={() => setAccount(null)}
         onLoadMore={(name, off) => void loadAccountTxs(name, accountScope, off)}

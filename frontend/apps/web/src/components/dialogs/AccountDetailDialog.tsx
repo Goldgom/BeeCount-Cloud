@@ -1,5 +1,6 @@
 import type {
   ReadAccount,
+  InvestmentAccountAssets,
   WorkspaceTag,
   WorkspaceTransaction
 } from '@beecount/api-client'
@@ -32,6 +33,7 @@ interface Props {
   total: number
   offset: number
   loading: boolean
+  investmentAccount: InvestmentAccountAssets | null
   tags: WorkspaceTag[]
   onClose: () => void
   onLoadMore: (accountName: string, offset: number) => void
@@ -48,6 +50,7 @@ export function AccountDetailDialog({
   total,
   offset,
   loading,
+  investmentAccount,
   tags,
   onClose,
   onLoadMore,
@@ -73,6 +76,8 @@ export function AccountDetailDialog({
                 上面这块 KPI 沿用打开时的快照,不跟随 scope 实时切换 —
                 跟 mobile 端 account_detail_page 行为一致。 */}
             <AccountStatsHeader account={account} t={t} />
+
+            <InvestmentHoldings account={investmentAccount} />
 
             {/* 信用卡 / 银行卡专属信息:bank_name / 卡号末 4 / 信用额度 /
                 账单日 / 还款日 + 倒计时。普通账户类型不渲染。 */}
@@ -100,6 +105,56 @@ export function AccountDetailDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+/** Investment account details use the server's account-id grouping, ensuring
+ * the displayed cash and holdings always belong to the opened account. */
+function InvestmentHoldings({ account }: { account: InvestmentAccountAssets | null }) {
+  if (!account) return null
+  const money = (value: number) => value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  const signed = (value: number) => `${value >= 0 ? '+' : ''}${money(value)}`
+  return (
+    <section className="border-b border-border/60 px-6 py-4">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Investment holdings</h3>
+          <p className="text-xs text-muted-foreground">Cash and market value for this account</p>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total assets</div>
+          <div className="font-mono text-lg font-bold tabular-nums">{money(account.total_assets)} {account.currency}</div>
+        </div>
+      </div>
+      <div className="mb-3 grid grid-cols-3 gap-2 text-center text-xs">
+        <InvestmentMetric label="Cash" value={money(account.cash_balance)} />
+        <InvestmentMetric label="Holdings" value={money(account.holdings_market_value)} />
+        <InvestmentMetric label="Today" value={signed(account.daily_pnl)} positive={account.daily_pnl >= 0} />
+      </div>
+      {account.items.length ? (
+        <div className="overflow-x-auto rounded-md border border-border/60">
+          <table className="w-full min-w-[680px] text-xs">
+            <thead className="bg-muted/30 text-left text-[10px] uppercase tracking-wide text-muted-foreground"><tr>
+              <th className="px-3 py-2">Product</th><th className="px-2 py-2">Qty</th><th className="px-2 py-2">Cost</th><th className="px-2 py-2">Price</th><th className="px-2 py-2">Value</th><th className="px-2 py-2">P/L</th><th className="px-2 py-2">Today</th>
+            </tr></thead>
+            <tbody>{account.items.map((item) => (
+              <tr key={item.id} className="border-t border-border/50">
+                <td className="px-3 py-2"><div className="font-medium">{item.name}</div><div className="text-[10px] text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}</div></td>
+                <td className="px-2 py-2 tabular-nums">{item.quantity}</td><td className="px-2 py-2 tabular-nums">{money(item.cost_basis)}</td><td className="px-2 py-2 tabular-nums">{item.current_price === null ? '—' : money(item.current_price)}</td><td className="px-2 py-2 tabular-nums">{money(item.market_value)}</td>
+                <td className={`px-2 py-2 tabular-nums ${item.holding_pnl >= 0 ? 'text-income' : 'text-expense'}`}>{signed(item.holding_pnl)}</td><td className={`px-2 py-2 tabular-nums ${item.daily_pnl >= 0 ? 'text-income' : 'text-expense'}`}>{signed(item.daily_pnl)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : <p className="text-sm text-muted-foreground">No holdings in this investment account.</p>}
+    </section>
+  )
+}
+
+function InvestmentMetric({ label, value, positive }: { label: string, value: string, positive?: boolean }) {
+  return <div className="rounded-md bg-muted/35 px-2 py-2"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div><div className={`mt-0.5 font-mono font-semibold tabular-nums ${positive === undefined ? '' : positive ? 'text-income' : 'text-expense'}`}>{value}</div></div>
 }
 
 function AccountStatsHeader({
