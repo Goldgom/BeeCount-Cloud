@@ -45,6 +45,9 @@ export type AccountForm = {
   bank_name: string
   /** 卡号后四位,bank_card / credit_card 元信息。 */
   card_last_four: string
+  investment_product_name: string
+  investment_product_symbol: string
+  investment_product_market: string
   /** 账户隐藏(issue #240)。只在编辑已有账户时通过「隐藏/恢复」切换修改;
    *  新建默认 false。 */
   hidden: boolean
@@ -125,6 +128,9 @@ export const accountDefaults = (): AccountForm => ({
   payment_due_day: '',
   bank_name: '',
   card_last_four: '',
+  investment_product_name: '',
+  investment_product_symbol: '',
+  investment_product_market: '',
   hidden: false,
 })
 

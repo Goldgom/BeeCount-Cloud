@@ -40,6 +40,7 @@ from ...models import (
     UserCategoryProjection,
     UserProfile,
     UserTagProjection,
+    InvestmentProduct,
 )
 from ...schemas import (
     AnalyticsMetric,

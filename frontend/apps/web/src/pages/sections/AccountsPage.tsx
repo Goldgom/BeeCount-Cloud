@@ -10,6 +10,7 @@ import {
   fetchWorkspaceAccounts,
   fetchWorkspaceTags,
   fetchWorkspaceTransactions,
+  fetchInvestmentAssets,
   updateAccount,
   type ExchangeRateOverride,
   type ExchangeRatesResponse,
@@ -18,6 +19,7 @@ import {
   type WorkspaceAccount,
   type WorkspaceTag,
   type WorkspaceTransaction,
+  type InvestmentAssetsResponse,
 } from '@beecount/api-client'
 import {
   Button,
@@ -107,6 +109,7 @@ export function AccountsPage() {
   const [trendOrComposition, setTrendOrComposition] = useState<AssetView>(
     () => readTrendOrComposition(),
   )
+  const [investmentAssets, setInvestmentAssets] = useState<InvestmentAssetsResponse | null>(null)
   useEffect(() => {
     try {
       localStorage.setItem(ASSET_VIEW_KEY, trendOrComposition)
@@ -188,6 +191,11 @@ export function AccountsPage() {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    if (!token) return
+    void fetchInvestmentAssets(token).then(setInvestmentAssets).catch(() => setInvestmentAssets(null))
+  }, [token, rows])
+
   useSyncRefresh(() => {
     void refresh()
   })
@@ -258,6 +266,9 @@ export function AccountsPage() {
         payment_due_day: isCreditCard ? paymentDueDayNum : null,
         bank_name: isBankOrCredit ? form.bank_name.trim() || null : null,
         card_last_four: isBankOrCredit ? form.card_last_four.trim() || null : null,
+        investment_product_name: form.account_type === 'investment' ? form.investment_product_name.trim() || null : null,
+        investment_product_symbol: form.account_type === 'investment' ? form.investment_product_symbol.trim().toUpperCase() || null : null,
+        investment_product_market: form.account_type === 'investment' ? form.investment_product_market.trim() || null : null,
         // 账户隐藏(issue #240):新建默认 false;编辑时带当前切换状态。
         hidden: form.hidden,
       }
@@ -540,6 +551,46 @@ export function AccountsPage() {
           </CardContent>
         </Card>
       )}
+      {investmentAssets && investmentAssets.items.length > 0 ? (
+        <Card className="bc-panel mb-4">
+          <CardContent className="space-y-3 p-5">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">{t('accounts.investment.holdings')}</p>
+                <p className="text-xs text-muted-foreground">{t('accounts.investment.subtitle')}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] text-muted-foreground">{t('accounts.investment.totalValue')}</div>
+                <Amount value={investmentAssets.total_market_value} currency={investmentAssets.base_currency} showCurrency bold />
+                <div className={investmentAssets.total_daily_pnl >= 0 ? 'text-xs text-emerald-600' : 'text-xs text-rose-600'}>
+                  {t('accounts.investment.dailyPnl')}: {investmentAssets.total_daily_pnl >= 0 ? '+' : ''}
+                  {investmentAssets.total_daily_pnl.toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="px-2 py-2">{t('accounts.investment.product')}</th>
+                  <th className="px-2 py-2">{t('accounts.investment.quantity')}</th>
+                  <th className="px-2 py-2">{t('accounts.investment.price')}</th>
+                  <th className="px-2 py-2">{t('accounts.investment.marketValue')}</th>
+                  <th className="px-2 py-2">{t('accounts.investment.dailyPnl')}</th>
+                </tr></thead>
+                <tbody>{investmentAssets.items.map((item) => (
+                  <tr key={item.id} className="border-b last:border-0">
+                    <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.symbol}{item.market ? \` · \${item.market}\` : ''}</div></td>
+                    <td className="px-2 py-2">{item.quantity}</td>
+                    <td className="px-2 py-2">{item.current_price ?? '—'}</td>
+                    <td className="px-2 py-2"><Amount value={item.market_value} currency={item.currency} showCurrency /></td>
+                    <td className={item.daily_pnl >= 0 ? 'px-2 py-2 text-emerald-600' : 'px-2 py-2 text-rose-600'}>{item.daily_pnl >= 0 ? '+' : ''}{item.daily_pnl.toFixed(2)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
       <AccountsPanel
         form={form}
         rows={rows}
@@ -568,6 +619,9 @@ export function AccountsPage() {
               : '',
             bank_name: row.bank_name ?? '',
             card_last_four: row.card_last_four ?? '',
+            investment_product_name: row.investment_product_name ?? '',
+            investment_product_symbol: row.investment_product_symbol ?? '',
+            investment_product_market: row.investment_product_market ?? '',
             hidden: row.hidden ?? false,
           })
         }}

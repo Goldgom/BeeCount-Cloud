@@ -18,7 +18,8 @@ import type {
   WorkspaceLedgerCounts,
   WorkspaceTag,
   WorkspaceTransaction,
-  WorkspaceTransactionPage
+  WorkspaceTransactionPage,
+  InvestmentAssetsResponse
 } from './types'
 
 export async function fetchReadLedgers(token: string): Promise<ReadLedger[]> {
@@ -55,6 +56,16 @@ export async function fetchReadSummary(token: string, ledgerId: string): Promise
 
 export async function fetchReadAccounts(token: string, ledgerId: string): Promise<ReadAccount[]> {
   return authedGet<ReadAccount[]>(`/read/ledgers/${encodeURIComponent(ledgerId)}/accounts`, token)
+}
+
+export async function fetchInvestmentAssets(
+  token: string,
+  refresh = true,
+): Promise<InvestmentAssetsResponse> {
+  return authedGet<InvestmentAssetsResponse>(
+    `/read/investment-assets?refresh=${refresh ? 'true' : 'false'}`,
+    token,
+  )
 }
 
 export async function fetchReadCategories(token: string, ledgerId: string): Promise<ReadCategory[]> {

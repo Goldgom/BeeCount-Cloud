@@ -337,6 +337,9 @@ def upsert_account(
         "payment_due_day": _opt_int(payload.get("paymentDueDay")),
         "bank_name": _as_str(payload.get("bankName")),
         "card_last_four": _as_str(payload.get("cardLastFour")),
+        "investment_product_name": _as_str(payload.get("investmentProductName")),
+        "investment_product_symbol": _as_str(payload.get("investmentProductSymbol")),
+        "investment_product_market": _as_str(payload.get("investmentProductMarket")),
         # 账户隐藏(issue #240)。merge_with_existing_user 已把缺键的 hidden
         # 从旧行补齐,这里直接取 merged payload 的值;全新 insert 首次缺失时给
         # False(未隐藏)。

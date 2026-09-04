@@ -660,6 +660,12 @@ function BankCardTile({
             <div className="truncate text-[12px] font-semibold leading-tight drop-shadow-sm">
               {row.name}
             </div>
+            {accountType === 'investment' && (row.investment_product_name || row.investment_product_symbol) ? (
+              <div className="truncate text-[9px] text-white/80">
+                {row.investment_product_name || ''}
+                {row.investment_product_symbol ? \` · \${row.investment_product_symbol}\` : ''}
+              </div>
+            ) : null}
           </div>
           <span className="shrink-0 rounded bg-white/25 px-1 py-[1px] text-[9px] font-semibold tracking-wider">
             {currency}
@@ -669,6 +675,9 @@ function BankCardTile({
         {/* 正文：按类型切换布局 */}
         {isValuation ? (
           <div className="mt-auto">
+            {accountType === 'investment' && row.investment_product_market ? (
+              <div className="mb-1 text-[9px] text-white/70">{row.investment_product_market}</div>
+            ) : null}
             <div className="text-[9px] uppercase tracking-[0.15em] text-white/75">
               {isLiability ? t('accounts.bankcard.currentOwed') : t('accounts.bankcard.currentValue')}
             </div>
@@ -1206,6 +1215,28 @@ export function AccountsPanel({
                 onChange={(e) => onFormChange({ ...form, initial_balance: e.target.value })}
               />
             </div>
+
+            {form.account_type === 'investment' ? (
+              <div className="rounded-md border border-pink-500/30 bg-pink-500/5 p-3 space-y-3">
+                <div className="text-xs font-semibold text-pink-600 dark:text-pink-400">
+                  {t('accounts.section.investment')}
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>{t('accounts.field.investmentProductName')}</Label>
+                    <Input value={form.investment_product_name} onChange={(e) => onFormChange({ ...form, investment_product_name: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{t('accounts.field.investmentProductSymbol')}</Label>
+                    <Input value={form.investment_product_symbol} onChange={(e) => onFormChange({ ...form, investment_product_symbol: e.target.value.toUpperCase() })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{t('accounts.field.investmentProductMarket')}</Label>
+                    <Input value={form.investment_product_market} onChange={(e) => onFormChange({ ...form, investment_product_market: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {/* 信用卡专属:信用额度 + 账单日 + 还款日(对齐 mobile credit_card
                 section)。还款提醒是 mobile 本地 SharedPreferences 不走 server,

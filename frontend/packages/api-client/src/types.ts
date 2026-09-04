@@ -238,9 +238,6 @@ export type ReadAccount = {
   investment_product_name?: string | null
   investment_product_symbol?: string | null
   investment_product_market?: string | null
-  investment_product_name?: string | null
-  investment_product_symbol?: string | null
-  investment_product_market?: string | null
   /** 账户隐藏(issue #240):true = 已隐藏 —— 记账/转账选择器不再出现,主列表
    *  退场收进「已隐藏」分区;但仍计入净资产/资产/收支(D1,服务端不做统计过滤)。
    *  缺省 false(旧接口未提供该字段时视为未隐藏)。 */
@@ -756,6 +753,29 @@ export type ExchangeRatesResponse = {
   stale: boolean
   /** 方向:1 base = x quote(展示折算前需取倒数,与 App 同规则)。 */
   rates: Record<string, string>
+}
+
+export type InvestmentHolding = {
+  id: string
+  name: string
+  symbol: string
+  market: string | null
+  currency: string
+  account_name: string | null
+  quantity: number
+  cost_basis: number
+  current_price: number | null
+  last_market_close: number | null
+  day_change: number | null
+  market_value: number
+  daily_pnl: number
+}
+
+export type InvestmentAssetsResponse = {
+  base_currency: string
+  total_market_value: number
+  total_daily_pnl: number
+  items: InvestmentHolding[]
 }
 
 export type ExchangeRateOverride = {
