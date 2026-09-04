@@ -693,14 +693,17 @@ async def create_investment_product(user: User, *, name: str, symbol: str,
                                     quantity: float, cost_basis: float = 0,
                                     currency: str = "CNY", market: str | None = None,
                                     account_name: str | None = None,
-                                    current_price: float | None = None) -> dict[str, Any]:
+                                    current_price: float | None = None,
+                                    last_market_close: float | None = None,
+                                    day_change: float | None = None) -> dict[str, Any]:
     if quantity < 0 or cost_basis < 0:
         raise ValueError("quantity and cost_basis must be non-negative")
     with SessionLocal() as db:
         row = InvestmentProduct(id=str(uuid4()), user_id=user.id, name=name.strip(), symbol=symbol.strip().upper(),
                                 quantity=quantity, cost_basis=cost_basis, currency=currency.strip().upper(),
                                 market=market, account_name=account_name, current_price=current_price,
-                                price_source="manual" if current_price is not None else None)
+                                price_source="manual" if current_price is not None else None,
+                                last_market_close=last_market_close, day_change=day_change)
         db.add(row); db.commit(); db.refresh(row)
         return {"status": "created", "id": row.id, "name": row.name, "symbol": row.symbol}
 
@@ -709,12 +712,15 @@ async def update_investment_product(user: User, *, product_id: str, name: str | 
                                     symbol: str | None = None, quantity: float | None = None,
                                     cost_basis: float | None = None, currency: str | None = None,
                                     market: str | None = None, account_name: str | None = None,
-                                    current_price: float | None = None) -> dict[str, Any]:
+                                    current_price: float | None = None,
+                                    last_market_close: float | None = None,
+                                    day_change: float | None = None) -> dict[str, Any]:
     with SessionLocal() as db:
         row = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
         if row is None: raise ValueError("Investment product not found")
         for key, value in (("name", name), ("symbol", symbol), ("quantity", quantity), ("cost_basis", cost_basis),
-                           ("currency", currency), ("market", market), ("account_name", account_name), ("current_price", current_price)):
+                           ("currency", currency), ("market", market), ("account_name", account_name), ("current_price", current_price),
+                           ("last_market_close", last_market_close), ("day_change", day_change)):
             if value is not None: setattr(row, key, value.upper() if key in {"symbol", "currency"} else value)
         row.updated_at = datetime.now(timezone.utc); db.commit()
         return {"status": "updated", "id": row.id}

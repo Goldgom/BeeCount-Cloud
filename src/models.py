@@ -594,6 +594,9 @@ class UserAccountProjection(Base):
     payment_due_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bank_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     card_last_four: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    investment_product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    investment_product_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    investment_product_market: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_change_id: Mapped[int] = mapped_column(BigInteger, default=0)
     # 账户隐藏(issue #240)。default false:既有行升级后不隐藏,旧 App 不发该
     # 字段时保持 false。只影响前端选择器/列表呈现,服务端不做任何统计过滤(D1)。
@@ -625,6 +628,8 @@ class InvestmentProduct(Base):
     current_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     price_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_market_close: Mapped[float | None] = mapped_column(Float, nullable=True)
+    day_change: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

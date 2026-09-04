@@ -396,7 +396,9 @@ async def delete_account(ctx: Context, account_id: str, confirm: bool = False,
 async def create_investment_product(ctx: Context, name: str, symbol: str, quantity: float,
                                     cost_basis: float = 0, currency: str = "CNY",
                                     market: str | None = None, account_name: str | None = None,
-                                    current_price: float | None = None) -> dict[str, Any]:
+                                    current_price: float | None = None,
+                                    last_market_close: float | None = None,
+                                    day_change: float | None = None) -> dict[str, Any]:
     """Record an investment product/holding."""
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="create_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,
@@ -408,7 +410,9 @@ async def update_investment_product(ctx: Context, product_id: str, name: str | N
                                     symbol: str | None = None, quantity: float | None = None,
                                     cost_basis: float | None = None, currency: str | None = None,
                                     market: str | None = None, account_name: str | None = None,
-                                    current_price: float | None = None) -> dict[str, Any]:
+                                    current_price: float | None = None,
+                                    last_market_close: float | None = None,
+                                    day_change: float | None = None) -> dict[str, Any]:
     """Update an investment holding."""
     kw = locals().copy(); kw.pop("ctx")
     return await _logged_call(ctx, name="update_investment_product", scope=SCOPE_MCP_WRITE, kwargs=kw,

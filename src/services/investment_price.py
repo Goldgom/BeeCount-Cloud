@@ -10,14 +10,14 @@ import httpx
 from ..config import get_settings
 
 
-async def fetch_price(symbol: str, market: str | None = None) -> tuple[float, str]:
+async def fetch_price(symbol: str, market: str | None = None) -> dict[str, float | str | None]:
     settings = get_settings()
     custom = getattr(settings, "investment_price_url", None)
     if custom:
         url = custom.format(symbol=symbol, market=market or "")
         async with httpx.AsyncClient(timeout=8) as client:
             data = (await client.get(url)).json()
-        return float(data["price"]), "custom"
+        return {"price": float(data["price"]), "source": "custom", "previous_close": data.get("previous_close"), "day_change": data.get("day_change")}
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
     async with httpx.AsyncClient(timeout=8, headers={"User-Agent": "BeeCount-Cloud"}) as client:
         data = (await client.get(url)).json()
@@ -26,4 +26,10 @@ async def fetch_price(symbol: str, market: str | None = None) -> tuple[float, st
     price = meta.get("regularMarketPrice") or meta.get("previousClose")
     if price is None:
         raise RuntimeError("price unavailable")
-    return float(price), "yahoo"
+    previous_close = meta.get("previousClose")
+    return {
+        "price": float(price),
+        "source": "yahoo",
+        "previous_close": float(previous_close) if previous_close is not None else None,
+        "day_change": float(price) - float(previous_close) if previous_close is not None else None,
+    }

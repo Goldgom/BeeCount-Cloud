@@ -283,14 +283,21 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
         for row in rows:
             price = row.current_price
             source = row.price_source or "manual"
+            last_close = row.last_market_close
+            day_change = row.day_change
             if refresh:
                 try:
-                    price, source = await fetch_price(row.symbol, row.market)
+                    quote = await fetch_price(row.symbol, row.market)
+                    price, source = quote["price"], quote["source"]
+                    last_close = quote.get("previous_close", last_close)
+                    day_change = quote.get("day_change", day_change)
                     row.current_price, row.price_source, row.price_updated_at = price, source, datetime.now(timezone.utc)
+                    row.last_market_close, row.day_change = last_close, day_change
                     db.commit()
                 except Exception:
                     pass
             value = float(row.quantity or 0) * float(price or 0)
+            daily_pnl = float(row.quantity or 0) * float(day_change or 0)
             native = value
             ccy = (row.currency or profile_currency).upper()
             if ccy != profile_currency:
@@ -304,8 +311,11 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
             items.append({"id": row.id, "name": row.name, "symbol": row.symbol, "market": row.market,
                           "currency": ccy, "account_name": row.account_name, "quantity": row.quantity,
                           "cost_basis": row.cost_basis, "price": price, "price_source": source,
+                          "last_market_close": last_close, "day_change": day_change,
+                          "cost_basis_total": round(float(row.cost_basis or 0), 2),
                           "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,
-                          "market_value": round(value, 2), "market_value_base": round(native, 2)})
+                          "market_value": round(value, 2), "market_value_base": round(native, 2),
+                          "daily_pnl": round(daily_pnl, 2)})
         return {"base_currency": profile_currency, "total_market_value": round(total, 2), "items": items}
 
 
@@ -316,6 +326,8 @@ def list_investment_products(user: User) -> list[dict[str, Any]]:
                  "currency": r.currency, "account_name": r.account_name,
                  "quantity": r.quantity, "cost_basis": r.cost_basis,
                  "current_price": r.current_price,
+                 "last_market_close": r.last_market_close,
+                 "day_change": r.day_change,
                  "price_updated_at": r.price_updated_at.isoformat() if r.price_updated_at else None} for r in rows]
 
 
@@ -327,6 +339,7 @@ def get_investment_product(user: User, product_id: str) -> dict[str, Any] | None
         return {"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
                 "currency": r.currency, "account_name": r.account_name, "quantity": r.quantity,
                 "cost_basis": r.cost_basis, "current_price": r.current_price,
+                "last_market_close": r.last_market_close, "day_change": r.day_change,
                 "price_source": r.price_source,
                 "price_updated_at": r.price_updated_at.isoformat() if r.price_updated_at else None}
 

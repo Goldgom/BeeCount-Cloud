@@ -23,6 +23,8 @@ def upgrade() -> None:
         sa.Column("current_price", sa.Float()),
         sa.Column("price_source", sa.String(64)),
         sa.Column("price_updated_at", sa.DateTime(timezone=True)),
+        sa.Column("last_market_close", sa.Float()),
+        sa.Column("day_change", sa.Float()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
