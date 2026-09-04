@@ -156,6 +156,7 @@ def build(db: Session, ledger: Ledger) -> dict[str, Any]:
         UserAccountProjection.investment_product_name,
         UserAccountProjection.investment_product_symbol,
         UserAccountProjection.investment_product_market,
+        UserAccountProjection.is_private,
         UserAccountProjection.hidden,
     ).where(UserAccountProjection.user_id == user_id)
     for (
@@ -173,6 +174,7 @@ def build(db: Session, ledger: Ledger) -> dict[str, Any]:
         investment_product_name,
         investment_product_symbol,
         investment_product_market,
+        is_private,
         hidden,
     ) in db.execute(acc_stmt).all():
         acc: dict[str, Any] = {"syncId": sid, "name": name or ""}
@@ -200,6 +202,7 @@ def build(db: Session, ledger: Ledger) -> dict[str, Any]:
             acc["investmentProductSymbol"] = investment_product_symbol
         if investment_product_market:
             acc["investmentProductMarket"] = investment_product_market
+        acc["isPrivate"] = bool(is_private)
         # 账户隐藏(issue #240):无条件输出(不像其它扩展字段那样"有值才带
         # key"),与 App serializeAccount 无条件发 hidden 对齐,保 /sync/full
         # 重装 / 新设备首次同步时隐藏标记不丢(03-tech-design-cloud.md §二 (B))。

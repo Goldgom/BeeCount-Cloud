@@ -74,6 +74,7 @@ class InvestmentHoldingOut(BaseModel):
     price_mode: str
     market_value: float
     daily_pnl: float
+    holding_pnl: float
 
 
 class InvestmentAssetsOut(BaseModel):
@@ -112,6 +113,7 @@ async def get_investment_assets(
                 pass
         value = float(row.quantity or 0) * float(price or 0)
         pnl = float(row.quantity or 0) * float(day_change or 0)
+        holding_pnl = float(row.quantity or 0) * (float(price or 0) - float(row.cost_basis or 0)) if price is not None else 0.0
         total += value
         total_pnl += pnl
         items.append(InvestmentHoldingOut(
@@ -121,6 +123,7 @@ async def get_investment_assets(
             current_price=price, last_market_close=previous_close, day_change=day_change,
             price_mode="manual" if row.price_source == "manual" else "auto",
             market_value=round(value, 2), daily_pnl=round(pnl, 2),
+            holding_pnl=round(holding_pnl, 2),
         ))
     return InvestmentAssetsOut(base_currency=base_currency, total_market_value=round(total, 2),
                                total_daily_pnl=round(total_pnl, 2), items=items)

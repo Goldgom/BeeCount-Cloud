@@ -587,6 +587,9 @@ function BankCardTile({
   const ccLimit = typeof row.credit_limit === 'number' ? row.credit_limit : null
   const ccOwed = Math.max(0, -displayBalance)
   const ccAvailable = ccLimit !== null ? Math.max(0, ccLimit - ccOwed) : null
+  const recentNet = (row.income_total ?? 0) - (row.expense_total ?? 0)
+  const bankName = row.bank_name?.trim() || ''
+  const bankMark = bankName ? bankName.slice(0, 2).toUpperCase() : accountType === 'credit_card' ? 'CC' : 'BK'
 
   return (
     <div
@@ -595,7 +598,7 @@ function BankCardTile({
       }`}
       style={{
         // 比 16:10 稍高一点，正文能放三列 stats 不挤。
-        aspectRatio: '16 / 11',
+        aspectRatio: '16 / 10',
         background: `linear-gradient(135deg, ${color} 0%, ${color}d9 40%, ${color}99 75%, ${color}66 100%)`,
         boxShadow: `0 4px 12px -4px ${color}66, 0 1px 2px rgba(0,0,0,0.06)`
       }}
@@ -653,8 +656,10 @@ function BankCardTile({
       <div className="relative flex h-full flex-col p-2.5">
         {/* 顶部：类型图标 + 账户名 + 币种 pill */}
         <div className="flex items-center gap-1.5">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/95 shadow-sm ring-1 ring-white/50">
-            <TypeIcon type={accountType} size={16} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/95 shadow-sm ring-1 ring-white/50">
+            {accountType === 'bank_card' || accountType === 'credit_card' ? (
+              <span className="text-[10px] font-black tracking-tight" style={{ color }}>{bankMark}</span>
+            ) : <TypeIcon type={accountType} size={18} />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[12px] font-semibold leading-tight drop-shadow-sm">
@@ -663,7 +668,7 @@ function BankCardTile({
             {accountType === 'investment' && (row.investment_product_name || row.investment_product_symbol) ? (
               <div className="truncate text-[9px] text-white/80">
                 {row.investment_product_name || ''}
-                {row.investment_product_symbol ? \` · \${row.investment_product_symbol}\` : ''}
+                {row.investment_product_symbol ? ` · ${row.investment_product_symbol}` : ''}
               </div>
             ) : null}
           </div>
@@ -671,6 +676,13 @@ function BankCardTile({
             {currency}
           </span>
         </div>
+
+        {(accountType === 'bank_card' || accountType === 'credit_card') && (bankName || row.card_last_four) ? (
+          <div className="mt-2 flex items-center justify-between text-[10px] text-white/80">
+            <span className="truncate">{bankName || t('accounts.bankcard.unknownBank')}</span>
+            {row.card_last_four ? <span className="font-mono tracking-[0.16em]">•••• {row.card_last_four}</span> : null}
+          </div>
+        ) : null}
 
         {/* 正文：按类型切换布局 */}
         {isValuation ? (
@@ -686,7 +698,7 @@ function BankCardTile({
               currency={currency}
               showCurrency
               bold
-              className="mt-0.5 block text-[18px] leading-tight drop-shadow text-white"
+              className="mt-0.5 block text-[24px] leading-tight drop-shadow text-white"
             />
           </div>
         ) : isCreditCard ? (
@@ -755,6 +767,12 @@ function BankCardTile({
             />
           </div>
         )}
+        {(accountType === 'bank_card' || accountType === 'credit_card') && hasStats ? (
+          <div className="mt-2 flex items-center justify-between rounded-md bg-black/15 px-2 py-1 text-[10px] backdrop-blur-[1px]">
+            <span className="text-white/70">{t('accounts.bankcard.recentChange')}</span>
+            <span className={recentNet >= 0 ? 'font-semibold text-emerald-100' : 'font-semibold text-amber-100'}>{recentNet >= 0 ? '+' : ''}{recentNet.toFixed(2)}</span>
+          </div>
+        ) : null}
       </div>
 
       {/* hover 操作按钮浮层（右上角，避开正文 stats） */}
@@ -1354,6 +1372,10 @@ export function AccountsPanel({
                 </button>
               </div>
             ) : null}
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+              <div><p className="text-sm font-medium">{t('accounts.private.toggleLabel')}</p><p className="mt-0.5 text-xs text-muted-foreground">{t('accounts.private.toggleHint')}</p></div>
+              <button type="button" role="switch" aria-checked={form.is_private} onClick={() => onFormChange({ ...form, is_private: !form.is_private })} className={`relative inline-flex h-5 w-9 items-center rounded-full ${form.is_private ? 'bg-primary' : 'bg-muted-foreground/30'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.is_private ? 'translate-x-[18px]' : 'translate-x-0.5'}`} /></button>
+            </div>
           </div>
           <DialogFooter>
             <Button

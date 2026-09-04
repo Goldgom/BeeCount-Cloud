@@ -104,6 +104,7 @@ _ACCOUNT_OPTIONAL_FIELD_MAP: tuple[tuple[str, str, str], ...] = (
     ("investment_product_name", "investmentProductName", "str"),
     ("investment_product_symbol", "investmentProductSymbol", "str"),
     ("investment_product_market", "investmentProductMarket", "str"),
+    ("is_private", "isPrivate", "bool"),
     # 账户隐藏(issue #240):Web create/update 请求体带 hidden(bool)时才写;
     # 不带 key → 保留原值(不冲掉已有隐藏标记,契约对齐 mobile push 的 merge
     # 缺键保留语义)。

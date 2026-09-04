@@ -597,6 +597,7 @@ class UserAccountProjection(Base):
     investment_product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     investment_product_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
     investment_product_market: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false(), default=False)
     source_change_id: Mapped[int] = mapped_column(BigInteger, default=0)
     # 账户隐藏(issue #240)。default false:既有行升级后不隐藏,旧 App 不发该
     # 字段时保持 false。只影响前端选择器/列表呈现,服务端不做任何统计过滤(D1)。

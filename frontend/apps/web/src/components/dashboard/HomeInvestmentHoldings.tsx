@@ -20,19 +20,17 @@ export function HomeInvestmentHoldings({ data }: { data: InvestmentAssetsRespons
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 pt-0">
-        {data.items.slice(0, 6).map((item) => (
-          <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/50 px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{item.name}</div>
-              <div className="truncate text-xs text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''} · {item.quantity} · {item.price_mode === 'manual' ? t('accounts.investment.manualPrice') : t('accounts.investment.autoPrice')}</div>
-            </div>
-            <div className="text-right">
-              <Amount value={item.market_value} currency={item.currency} showCurrency bold size="sm" />
-              <div className={item.daily_pnl >= 0 ? 'text-xs text-emerald-600' : 'text-xs text-rose-600'}>{item.daily_pnl >= 0 ? '+' : ''}{item.daily_pnl.toFixed(2)}</div>
-            </div>
-          </div>
-        ))}
+      <CardContent className="overflow-x-auto pt-0">
+        <table className="w-full min-w-[760px] text-xs">
+          <thead><tr className="border-b text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+            <th className="px-2 py-2">{t('accounts.investment.product')}</th><th className="px-2 py-2">{t('accounts.investment.quantity')}</th><th className="px-2 py-2">{t('accounts.investment.costPrice')}</th><th className="px-2 py-2">{t('accounts.investment.marketPrice')}</th><th className="px-2 py-2">{t('accounts.investment.marketValue')}</th><th className="px-2 py-2">{t('accounts.investment.holdingPnl')}</th><th className="px-2 py-2">{t('accounts.investment.dailyPnl')}</th>
+          </tr></thead>
+          <tbody>{data.items.map((item) => <tr key={item.id} className="border-b last:border-0">
+            <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-[10px] text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}</div></td>
+            <td className="px-2 py-2">{item.quantity}</td><td className="px-2 py-2">{item.cost_basis.toFixed(2)}</td><td className="px-2 py-2">{item.current_price?.toFixed(2) ?? '—'}</td><td className="px-2 py-2"><Amount value={item.market_value} currency={item.currency} showCurrency /></td>
+            <td className={item.holding_pnl >= 0 ? 'px-2 py-2 text-emerald-600' : 'px-2 py-2 text-rose-600'}>{item.holding_pnl >= 0 ? '+' : ''}{item.holding_pnl.toFixed(2)}</td><td className={item.daily_pnl >= 0 ? 'px-2 py-2 text-emerald-600' : 'px-2 py-2 text-rose-600'}>{item.daily_pnl >= 0 ? '+' : ''}{item.daily_pnl.toFixed(2)}</td>
+          </tr>)}</tbody>
+        </table>
       </CardContent>
     </Card>
   )

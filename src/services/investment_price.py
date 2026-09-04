@@ -12,12 +12,13 @@ from ..config import get_settings
 
 async def fetch_price(symbol: str, market: str | None = None) -> dict[str, float | str | None]:
     settings = get_settings()
+    provider = (getattr(settings, "investment_price_provider", "yahoo") or "yahoo").lower()
     custom = getattr(settings, "investment_price_url", None)
     if custom:
         url = custom.format(symbol=symbol, market=market or "")
         async with httpx.AsyncClient(timeout=8) as client:
             data = (await client.get(url)).json()
-        return {"price": float(data["price"]), "source": "custom", "previous_close": data.get("previous_close"), "day_change": data.get("day_change")}
+        return {"price": float(data["price"]), "source": provider, "previous_close": data.get("previous_close"), "day_change": data.get("day_change")}
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
     async with httpx.AsyncClient(timeout=8, headers={"User-Agent": "BeeCount-Cloud"}) as client:
         data = (await client.get(url)).json()

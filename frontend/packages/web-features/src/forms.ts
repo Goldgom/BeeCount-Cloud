@@ -48,6 +48,7 @@ export type AccountForm = {
   investment_product_name: string
   investment_product_symbol: string
   investment_product_market: string
+  is_private: boolean
   /** 账户隐藏(issue #240)。只在编辑已有账户时通过「隐藏/恢复」切换修改;
    *  新建默认 false。 */
   hidden: boolean
@@ -131,6 +132,7 @@ export const accountDefaults = (): AccountForm => ({
   investment_product_name: '',
   investment_product_symbol: '',
   investment_product_market: '',
+  is_private: false,
   hidden: false,
 })
 

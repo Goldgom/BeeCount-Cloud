@@ -373,13 +373,14 @@ def list_accounts(
     # source_change_id 最大(最新)的一份。
     # user-global per-user 表已经唯一,_dedupe_by_sync_id 是 no-op,但保留
      # 调用以兼容历史 helper 签名,不影响行为。
-    rows = _dedupe_by_sync_id(
-        db.scalars(
-            select(UserAccountProjection)
-            .where(UserAccountProjection.user_id == current_user.id)
-            .order_by(UserAccountProjection.sync_id.asc())
-        ).all()
-    )
+    from ...config import get_settings
+    visibility = get_settings().account_visibility_mode.strip().lower()
+    q = select(UserAccountProjection)
+    if visibility == "shared":
+        q = q.where(or_(UserAccountProjection.is_private.is_(False), UserAccountProjection.user_id == current_user.id, current_user.is_admin))
+    else:
+        q = q.where(UserAccountProjection.user_id == current_user.id)
+    rows = _dedupe_by_sync_id(db.scalars(q.order_by(UserAccountProjection.sync_id.asc())).all())
     rows.sort(key=lambda r: (r.name or "").lower())
     return [
         ReadAccountOut(
@@ -402,6 +403,7 @@ def list_accounts(
             investment_product_name=row.investment_product_name,
             investment_product_symbol=row.investment_product_symbol,
             investment_product_market=row.investment_product_market,
+            is_private=row.is_private,
             hidden=row.hidden,
         )
         for row in rows

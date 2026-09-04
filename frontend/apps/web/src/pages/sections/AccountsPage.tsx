@@ -269,6 +269,7 @@ export function AccountsPage() {
         investment_product_name: form.account_type === 'investment' ? form.investment_product_name.trim() || null : null,
         investment_product_symbol: form.account_type === 'investment' ? form.investment_product_symbol.trim().toUpperCase() || null : null,
         investment_product_market: form.account_type === 'investment' ? form.investment_product_market.trim() || null : null,
+        is_private: form.is_private,
         // 账户隐藏(issue #240):新建默认 false;编辑时带当前切换状态。
         hidden: form.hidden,
       }
@@ -579,7 +580,7 @@ export function AccountsPage() {
                 </tr></thead>
                 <tbody>{investmentAssets.items.map((item) => (
                   <tr key={item.id} className="border-b last:border-0">
-                    <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.symbol}{item.market ? \` · \${item.market}\` : ''}</div></td>
+                    <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}</div></td>
                     <td className="px-2 py-2">{item.quantity}</td>
                     <td className="px-2 py-2">{item.current_price ?? '—'}</td>
                     <td className="px-2 py-2"><Amount value={item.market_value} currency={item.currency} showCurrency /></td>
@@ -622,6 +623,7 @@ export function AccountsPage() {
             investment_product_name: row.investment_product_name ?? '',
             investment_product_symbol: row.investment_product_symbol ?? '',
             investment_product_market: row.investment_product_market ?? '',
+            is_private: row.is_private ?? false,
             hidden: row.hidden ?? false,
           })
         }}

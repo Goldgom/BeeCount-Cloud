@@ -639,9 +639,18 @@ def list_workspace_accounts(
         )
     ) or 0)
 
-    account_query = select(UserAccountProjection).where(
-        UserAccountProjection.user_id == target_user_id
-    )
+    from ...config import get_settings
+    visibility = get_settings().account_visibility_mode.strip().lower()
+    if visibility == "shared" and not user_id:
+        account_query = select(UserAccountProjection).where(
+            or_(UserAccountProjection.is_private.is_(False),
+                UserAccountProjection.user_id == current_user.id,
+                current_user.is_admin)
+        )
+    else:
+        account_query = select(UserAccountProjection).where(
+            UserAccountProjection.user_id == target_user_id
+        )
     if q:
         account_query = account_query.where(UserAccountProjection.name.ilike(f"%{q}%"))
 
@@ -678,6 +687,7 @@ def list_workspace_accounts(
                 investment_product_name=acct.investment_product_name,
                 investment_product_symbol=acct.investment_product_symbol,
                 investment_product_market=acct.investment_product_market,
+                is_private=acct.is_private,
                 hidden=acct.hidden,
                 tx_count=tx_count,
                 income_total=income_total,

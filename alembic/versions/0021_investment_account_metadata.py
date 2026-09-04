@@ -11,6 +11,7 @@ def upgrade() -> None:
     op.add_column("user_account_projection", sa.Column("investment_product_name", sa.Text(), nullable=True))
     op.add_column("user_account_projection", sa.Column("investment_product_symbol", sa.String(64), nullable=True))
     op.add_column("user_account_projection", sa.Column("investment_product_market", sa.String(32), nullable=True))
+    op.add_column("user_account_projection", sa.Column("is_private", sa.Boolean(), nullable=False, server_default=sa.false()))
 
 def downgrade() -> None:
     op.drop_column("user_account_projection", "investment_product_market")

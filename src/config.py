@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     scheduler_timezone: str = Field(default="", alias="SCHEDULER_TIMEZONE")
     device_online_window_minutes: int = 10
     allow_app_rw_scopes: bool = True
+    # Account visibility: shared = all users see non-private accounts;
+    # isolated = each user only sees their own accounts.
+    account_visibility_mode: str = Field(default="shared", alias="ACCOUNT_VISIBILITY_MODE")
+    investment_price_provider: str = Field(default="yahoo", alias="INVESTMENT_PRICE_PROVIDER")
 
     # Open registration is a footgun on self-hosted deployments: anyone with
     # the public URL could create a user. Default OFF; operators set this to

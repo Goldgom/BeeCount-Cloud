@@ -299,6 +299,7 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                     pass
             value = float(row.quantity or 0) * float(price or 0)
             daily_pnl = float(row.quantity or 0) * float(day_change or 0)
+            holding_pnl = float(row.quantity or 0) * (float(price or 0) - float(row.cost_basis or 0)) if price is not None else 0.0
             total_daily_pnl += daily_pnl
             native = value
             ccy = (row.currency or profile_currency).upper()
@@ -318,7 +319,7 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                           "cost_basis_total": round(float(row.cost_basis or 0), 2),
                           "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,
                           "market_value": round(value, 2), "market_value_base": round(native, 2),
-                          "daily_pnl": round(daily_pnl, 2)})
+                          "daily_pnl": round(daily_pnl, 2), "holding_pnl": round(holding_pnl, 2)})
         return {"base_currency": profile_currency, "total_market_value": round(total, 2),
                 "total_daily_pnl": round(total_daily_pnl, 2), "items": items}
 

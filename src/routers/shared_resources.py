@@ -14,7 +14,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -102,6 +102,7 @@ def get_shared_resources(
     accts = db.scalars(
         select(UserAccountProjection)
         .where(UserAccountProjection.user_id == owner_user_id)
+        .where(or_(UserAccountProjection.is_private.is_(False), UserAccountProjection.user_id == current_user.id, current_user.is_admin))
     ).all()
     tgs = db.scalars(
         select(UserTagProjection)
