@@ -52,6 +52,9 @@ type MobileStyleAssetsProps = {
   /** true 时跳过多币种「每币种一张卡」网格区(折算汇总视图接管了多币种展示);
    *  账户列表/新建按钮等其余内容照常。缺省 false —— 其它调用方零影响。 */
   hideCurrencyCards?: boolean
+  /** Bound holding market value by investment account id.  Cash remains on the
+   * account row; tiles add this amount once to show the account's total value. */
+  investmentValuations?: Record<string, number>
   /** 账户隐藏(issue #240):底部「已隐藏」分区里,每张隐藏卡的快捷「恢复」
    *  按钮回调(不经编辑弹窗,直接 PATCH hidden=false)。不传则不渲染该按钮。 */
   onRestore?: (row: ReadAccount) => void
@@ -73,6 +76,7 @@ function MobileStyleAssets({
   onClickAccount,
   onCreate,
   hideCurrencyCards = false,
+  investmentValuations = {},
   onRestore
 }: MobileStyleAssetsProps) {
   const t = useT()
@@ -197,6 +201,7 @@ function MobileStyleAssets({
                       color={group.color}
                       isLiability={group.isLiability}
                       canManage={canManage}
+                      investmentValuation={investmentValuations[row.id] ?? 0}
                       onEdit={() => onEdit(row)}
                       onDelete={onDelete ? () => onDelete(row) : undefined}
                       onClick={onClickAccount ? () => onClickAccount(row) : undefined}
@@ -558,6 +563,7 @@ function BankCardTile({
   color,
   isLiability,
   canManage,
+  investmentValuation = 0,
   onEdit,
   onDelete,
   onClick
@@ -566,6 +572,7 @@ function BankCardTile({
   color: string
   isLiability: boolean
   canManage: boolean
+  investmentValuation?: number
   onEdit: () => void
   onDelete?: () => void
   onClick?: () => void
@@ -582,6 +589,7 @@ function BankCardTile({
   const displayBalance = hasStats ? (row.balance as number) : row.initial_balance ?? 0
   // 估值账户：负债显示绝对值欠款，资产显示当前估值。
   const valuationValue = isLiability ? Math.abs(displayBalance) : displayBalance
+  const totalInvestmentValue = displayBalance + investmentValuation
   // 信用卡：按负债展示。已用 = max(0, -balance),可用 = 额度 - 已用(对齐 mobile）。
   const isCreditCard = accountType === 'credit_card'
   const ccLimit = typeof row.credit_limit === 'number' ? row.credit_limit : null
@@ -685,7 +693,26 @@ function BankCardTile({
         ) : null}
 
         {/* 正文：按类型切换布局 */}
-        {isValuation ? (
+        {accountType === 'investment' ? (
+          <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-black/15 px-2 py-1.5 backdrop-blur-[1px]">
+            <StatCell
+              label={t('accounts.bankcard.balance')}
+              value={displayBalance}
+              currency={currency}
+              tone={displayBalance < 0 ? 'warn' : 'default'}
+            />
+            <StatCell
+              label={t('accounts.investment.marketValue')}
+              value={investmentValuation}
+              currency={currency}
+            />
+            <StatCell
+              label={t('accounts.investment.totalValue')}
+              value={totalInvestmentValue}
+              currency={currency}
+            />
+          </div>
+        ) : isValuation ? (
           <div className="mt-auto">
             {accountType === 'investment' && row.investment_product_market ? (
               <div className="mb-1 text-[9px] text-white/70">{row.investment_product_market}</div>
@@ -1045,6 +1072,7 @@ type AccountsPanelProps = {
   /** true 时跳过多币种「每币种一张卡」网格区(用于折算汇总视图);缺省 false,
    *  其它调用方零影响。详见 MobileStyleAssets。 */
   hideCurrencyCards?: boolean
+  investmentValuations?: Record<string, number>
   /** 账户隐藏(issue #240):底部「已隐藏」分区每张卡的快捷「恢复」按钮回调。
    *  不传则该按钮不渲染(调用方尚未接线时零影响)。 */
   onRestore?: (row: ReadAccount) => void
@@ -1062,6 +1090,7 @@ export function AccountsPanel({
   onDelete,
   onClickAccount,
   hideCurrencyCards = false,
+  investmentValuations = {},
   onRestore
 }: AccountsPanelProps) {
   const t = useT()
@@ -1142,7 +1171,8 @@ export function AccountsPanel({
           onDelete={onDelete}
           onClickAccount={onClickAccount}
           onCreate={handleOpenCreate}
-          hideCurrencyCards={hideCurrencyCards}
+        hideCurrencyCards={hideCurrencyCards}
+        investmentValuations={investmentValuations}
           onRestore={onRestore}
         />
       )}

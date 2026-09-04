@@ -142,7 +142,7 @@ function InvestmentHoldings({ account }: { account: InvestmentAccountAssets | nu
             <tbody>{account.items.map((item) => (
               <tr key={item.id} className="border-t border-border/50">
                 <td className="px-3 py-2"><div className="font-medium">{item.name}</div><div className="text-[10px] text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}</div></td>
-                <td className="px-2 py-2 tabular-nums">{item.quantity}</td><td className="px-2 py-2 tabular-nums">{money(item.cost_basis)}</td><td className="px-2 py-2 tabular-nums">{item.current_price === null ? '—' : money(item.current_price)}</td><td className="px-2 py-2 tabular-nums">{money(item.market_value)}</td>
+                <td className="px-2 py-2 tabular-nums">{item.quantity}</td><td className="px-2 py-2 tabular-nums">{money(item.cost_basis)}</td><td className="px-2 py-2 tabular-nums"><div>{item.current_price === null ? '—' : money(item.current_price)}</div>{item.day_change !== null ? <div className={`text-[10px] ${item.day_change >= 0 ? 'text-income' : 'text-expense'}`}>{signed(item.day_change)} / day</div> : null}</td><td className="px-2 py-2 tabular-nums">{money(item.market_value)}</td>
                 <td className={`px-2 py-2 tabular-nums ${item.holding_pnl >= 0 ? 'text-income' : 'text-expense'}`}>{signed(item.holding_pnl)}</td><td className={`px-2 py-2 tabular-nums ${item.daily_pnl >= 0 ? 'text-income' : 'text-expense'}`}>{signed(item.daily_pnl)}</td>
               </tr>
             ))}</tbody>

@@ -302,9 +302,14 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
                     db.commit()
                 except Exception:
                     pass
-            value = float(row.quantity or 0) * float(price or 0)
+            # Keep automatic pricing retryable, but never value an unquoted
+            # holding at zero: cost_basis is the deterministic fallback.
+            valuation_price = float(price) if price is not None else float(row.cost_basis or 0)
+            if price is None and row.price_source != "manual":
+                source = "cost_basis_fallback"
+            value = float(row.quantity or 0) * valuation_price
             daily_pnl = float(row.quantity or 0) * float(day_change or 0)
-            holding_pnl = float(row.quantity or 0) * (float(price or 0) - float(row.cost_basis or 0)) if price is not None else 0.0
+            holding_pnl = float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
             total_daily_pnl += daily_pnl
             native = value
             ccy = (row.currency or profile_currency).upper()
@@ -318,7 +323,7 @@ async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str
             total += native
             item = {"id": row.id, "name": row.name, "symbol": row.symbol, "market": row.market,
                           "currency": ccy, "account_id": row.account_id, "account_name": row.account_name, "quantity": row.quantity,
-                          "cost_basis": row.cost_basis, "price": price, "price_source": source,
+                          "cost_basis": row.cost_basis, "price": valuation_price, "price_source": source,
                           "price_mode": "manual" if source == "manual" else "auto",
                           "last_market_close": last_close, "day_change": day_change,
                           "cost_basis_total": round(float(row.cost_basis or 0), 2),

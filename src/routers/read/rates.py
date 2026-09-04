@@ -132,16 +132,20 @@ async def get_investment_assets(
                 db.commit()
             except Exception:
                 pass
-        value = float(row.quantity or 0) * float(price or 0)
+        # An automatic quote may be unavailable (provider outage, unknown
+        # symbol, or an empty response).  Keep the row eligible for a future
+        # refresh, but value it at cost for this response instead of zero.
+        valuation_price = float(price) if price is not None else float(row.cost_basis or 0)
+        value = float(row.quantity or 0) * valuation_price
         pnl = float(row.quantity or 0) * float(day_change or 0)
-        holding_pnl = float(row.quantity or 0) * (float(price or 0) - float(row.cost_basis or 0)) if price is not None else 0.0
+        holding_pnl = float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
         total += value
         total_pnl += pnl
         item = InvestmentHoldingOut(
             id=row.id, name=row.name, symbol=row.symbol, market=row.market,
             currency=row.currency, account_id=row.account_id, account_name=row.account_name,
             quantity=float(row.quantity or 0), cost_basis=float(row.cost_basis or 0),
-            current_price=price, last_market_close=previous_close, day_change=day_change,
+            current_price=valuation_price, last_market_close=previous_close, day_change=day_change,
             price_mode="manual" if row.price_source == "manual" else "auto",
             market_value=round(value, 2), daily_pnl=round(pnl, 2),
             holding_pnl=round(holding_pnl, 2),
