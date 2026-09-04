@@ -14,7 +14,7 @@ import os
 
 # CI 推 tag 时通过 --build-arg VERSION=x.y.z 传入,Dockerfile 写进 ENV。
 # 本地 `uvicorn` 运行时没这个 env,走下面 fallback。
-_FALLBACK_VERSION = "1.0.0"
+_FALLBACK_VERSION = "2.0.0"
 __version__ = (os.environ.get("APP_VERSION") or _FALLBACK_VERSION).strip()
 
 APP_NAME = "BeeCount Cloud"
