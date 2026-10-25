@@ -14,6 +14,8 @@ async def all_assets(db, user_id, investment):
     accounts = account_balances(db, user_id=user_id)
     components = []
     for account_id, account in accounts.items():
+        if account_id in investment.get('replaced_account_ids', []):
+            continue
         fx = await graph.resolve(account['currency'], base)
         components.append(dict(id=account_id, kind='account_cash', name=account['account_name'],
             currency=account['currency'], amount=account['cash_balance'],
@@ -30,11 +32,12 @@ async def all_assets(db, user_id, investment):
         components.append(dict(id=item['id'], kind='receivable', name=item['payload'].get('name'),
             currency=currency, amount=float(item['remaining']), amount_base=converted(item['remaining'], fx),
             fx=fx, as_of=item['effective_at']))
+    components.extend(investment.get('data_source_components', []))
     values = [item['amount_base'] for item in components]
     missing = [item['id'] for item in components if item['amount_base'] is None]
     return dict(scope='all_assets', base_currency=base, total_assets=total(values), net_equity=total(values),
-        known_total_assets=known(values), available_balance=None,
-        composition='account_cash_plus_holdings_plus_outstanding_receivables',
+        known_total_assets=known(values) + sum(c.get('known_amount_base', 0) for c in components if c['kind']=='data_source_equity' and c['amount_base'] is None), available_balance=None,
+        composition='account_cash_plus_holdings_plus_outstanding_receivables_plus_external_equity',
         coverage=dict(components_total=len(components), components_valued=len(components)-len(missing), missing_component_ids=missing),
         completeness='partial' if missing else 'complete',
         as_of=investment['as_of'], as_of_status='mixed_observation_times',

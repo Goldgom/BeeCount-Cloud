@@ -15,6 +15,7 @@ export const APP_SECTIONS: AppSection[] = [
   'calendar',
   'accounts',
   'finance',
+  'data-sources',
   'categories',
   'tags',
   'budgets',
@@ -189,6 +190,9 @@ export function parseRoute(pathname: string): AppRoute {
   ) {
     return { kind: 'app', ledgerId: '', section: parseRootSection(parts.slice(1)) }
   }
+  if (parts[1] === 'data-sources') {
+    return { kind: 'app', ledgerId: '', section: 'data-sources' }
+  }
   if (parts[1] === 'import') {
     return { kind: 'app', ledgerId: '', section: 'import' }
   }
@@ -242,6 +246,8 @@ export function routePath(route: AppRoute): string {
       return '/app/admin/backup'
     case 'admin-data-cleanup':
       return '/app/admin/data-cleanup'
+    case 'data-sources':
+      return '/app/data-sources'
     case 'import':
       return '/app/import'
   }

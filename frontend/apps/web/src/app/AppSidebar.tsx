@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { BookOpen, CalendarDays, ChartNoAxesCombined, CircleHelp, FolderInput, Home, LayoutGrid, Receipt, Tag, Wallet } from 'lucide-react'
+import { BookOpen, CalendarDays, ChartNoAxesCombined, CircleHelp, Database, FolderInput, Home, LayoutGrid, Receipt, Tag, Wallet } from 'lucide-react'
 import { useT } from '@beecount/ui'
 import { useLedgers } from '../context/LedgersContext'
 
@@ -8,6 +8,7 @@ const items = [
   { path: 'transactions', label: 'nav.transactions', Icon: Receipt },
   { path: 'finance', label: 'finance.title', Icon: ChartNoAxesCombined },
   { path: 'accounts', label: 'nav.accounts', Icon: Wallet },
+  { path: 'data-sources', label: 'nav.dataSources', Icon: Database },
   { path: 'calendar', label: 'nav.calendar', Icon: CalendarDays },
   { path: 'budgets', label: 'nav.budgets', Icon: ChartNoAxesCombined },
   { path: 'categories', label: 'nav.categories', Icon: LayoutGrid },

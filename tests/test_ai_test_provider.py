@@ -285,7 +285,10 @@ def test_rate_limit_after_30_requests():
     client = _make_client()
     try:
         token = _register_and_login(client, "tp7@test.com")
-        with patch("httpx.AsyncClient.post", fake_post):
+        # This test exercises the local limiter, not adaptive model discovery.
+        # Bypass that upstream work so 30 calls do not outlive the 60s window.
+        from unittest.mock import AsyncMock
+        with patch("src.routers.ai.test_provider._test_text", new=AsyncMock(return_value="ok")):
             payload = {
                 "provider": {
                     "apiKey": "sk-x",

@@ -21,6 +21,11 @@ async def investment_assets(db, user_id, refresh=True):
     rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == user_id).order_by(InvestmentProduct.name)).all()
     graph = ConversionGraph(db, user_id)
     accounts = investment_account_cash_balances(db, user_id=user_id)
+    from .data_sources import valuation_components
+    source_components = await valuation_components(db, user_id, graph, base)
+    replaced_accounts = {c['account_id'] for c in source_components if c['coverage_policy'] == 'replace_bound_account'}
+    accounts = {key:value for key,value in accounts.items() if key not in replaced_accounts}
+    rows = [row for row in rows if row.account_id not in replaced_accounts]
     items = []
     for row in rows:
         mode = 'money_fund' if row.is_money_fund else row.valuation_mode
@@ -86,14 +91,16 @@ async def investment_assets(db, user_id, refresh=True):
     daily_values = [item['daily_pnl_base'] for item in items]
     unbound = [item['id'] for item in items if item['account_id'] not in accounts]
     missing = [item['id'] for item in items if item['market_value_base'] is None]
+    source_values = [c['amount_base'] for c in source_components]
     result = dict(base_currency=base, scope='investment_only', all_assets_total=None,
+        data_source_components=source_components, replaced_account_ids=sorted(replaced_accounts),
         total_market_value=total(values), total_daily_pnl=total(daily_values),
-        total_cash_balance=total(cash_values), total_assets=total(values + cash_values),
-        net_equity=total(values + cash_values), available_balance=None,
-        known_market_value=known(values), known_cash_balance=known(cash_values), known_total_assets=known(values + cash_values),
+        total_cash_balance=total(cash_values), total_assets=total(values + cash_values + source_values),
+        net_equity=total(values + cash_values + source_values), available_balance=None,
+        known_market_value=known(values), known_cash_balance=known(cash_values), known_total_assets=known(values + cash_values) + sum(c['known_amount_base'] for c in source_components),
         coverage=dict(holdings_total=len(items), holdings_valued=len(items)-len(missing), missing_holding_ids=missing,
                       cash_accounts_total=len(account_items), cash_accounts_valued=sum(v is not None for v in cash_values), unbound_holding_ids=unbound),
-        completeness='complete' if not missing and not unbound and all(v is not None for v in cash_values) else 'partial',
+        completeness='complete' if not missing and not unbound and all(v is not None for v in cash_values + source_values) else 'partial',
         as_of=datetime.now(timezone.utc).isoformat(), as_of_status='mixed_observation_times',
         valuation_times_complete=all(item['as_of'] is not None for item in items),
         cash_times_complete=all(data.get('cash_as_of') is not None for data in accounts.values()),

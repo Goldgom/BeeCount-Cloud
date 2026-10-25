@@ -17,3 +17,4 @@ export * from './types'
 export * from './write'
 
 export * from './finance'
+export * from './data-sources'

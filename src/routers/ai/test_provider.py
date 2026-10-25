@@ -11,6 +11,9 @@
 """
 from __future__ import annotations
 
+# This is an application route module, not a pytest test module.
+__test__ = False
+
 import logging
 import time
 from collections import defaultdict, deque

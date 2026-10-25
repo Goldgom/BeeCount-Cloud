@@ -853,3 +853,4 @@ class BackupRunTarget(Base):
 
 # Register cloud-only finance journal.
 from . import models_finance  # noqa: E402,F401
+from . import models_data_sources  # noqa: E402,F401

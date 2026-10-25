@@ -573,6 +573,7 @@ const zhCN = {
   'nav.transactions': '交易',
   'nav.calendar': '日历',
   'nav.accounts': '资产',
+  'nav.dataSources': '数据源',
   'nav.categories': '分类',
   'nav.tags': '标签',
   'nav.budgets': '预算',

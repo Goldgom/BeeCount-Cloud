@@ -25,7 +25,7 @@ from .observability import configure_logging, install_request_middleware
 from .bootstrap_admin import ensure_admin
 from .routers import admin, attachments, auth, devices, pats, profile, read, sync, write, ws
 from .routers import admin_backup, mcp_calls, two_factor
-from .routers import investment_products, finance
+from .routers import investment_products, finance, data_sources
 from .routers import ai as ai_router
 from .routers import import_data as import_router
 from .routers import invites as invites_router
@@ -87,6 +87,25 @@ async def _start_finance_snapshot_scheduler():
         scheduler.start()
     except Exception:
         logging.getLogger(__name__).exception("finance.snapshot.scheduler.start_failed")
+
+@app.on_event('startup')
+async def _start_data_source_scheduler():
+    import asyncio
+    from .services.data_sources import scheduler_loop
+    app.state.data_source_task = asyncio.create_task(scheduler_loop())
+
+
+@app.on_event('shutdown')
+async def _stop_data_source_scheduler():
+    import asyncio
+    task = getattr(app.state, 'data_source_task', None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
 
 @app.on_event("shutdown")
 async def _stop_finance_snapshot_scheduler():
@@ -179,6 +198,7 @@ app.include_router(write.router, prefix=f"{settings.api_prefix}/write", tags=["w
 app.include_router(attachments.router, prefix=f"{settings.api_prefix}/attachments", tags=["attachments"])
 app.include_router(investment_products.router, prefix=f"{settings.api_prefix}/investment-products", tags=["investment-products"])
 app.include_router(finance.router, prefix=settings.api_prefix)
+app.include_router(data_sources.router, prefix=settings.api_prefix)
 app.include_router(profile.router, prefix=f"{settings.api_prefix}/profile", tags=["profile"])
 app.include_router(pats.router, prefix=f"{settings.api_prefix}/profile/pats", tags=["pats"])
 app.include_router(

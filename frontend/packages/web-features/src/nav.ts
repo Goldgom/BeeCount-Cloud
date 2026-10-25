@@ -4,6 +4,7 @@ export type AppSection =
   | 'calendar'
   | 'accounts'
   | 'finance'
+  | 'data-sources'
   | 'categories'
   | 'tags'
   | 'budgets'
@@ -40,6 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // calendar 不放主导航(高频但不是"主视图"等级,跟 transactions 重复语义);
       // 入口走 AppHeader 右上角图标 + ⌘K + AvatarDropdown 任一即可。
       { key: 'accounts', labelKey: 'nav.accounts' },
+      { key: 'data-sources', labelKey: 'nav.dataSources' },
       { key: 'categories', labelKey: 'nav.categories' },
       { key: 'tags', labelKey: 'nav.tags' }
       // 预算从顶部 bookkeeping 组移出,改放头像下拉的"工具"里 —— 用户

@@ -67,6 +67,7 @@ const zhTW = {
   'nav.transactions': '交易',
   'nav.calendar': '日曆',
   'nav.accounts': '帳戶',
+  'nav.dataSources': '資料來源',
   'nav.categories': '分類',
   'nav.tags': '標籤',
   'nav.budgets': '預算',

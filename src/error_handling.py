@@ -147,7 +147,8 @@ def register_exception_handlers(app: FastAPI) -> None:
                 request=request,
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 message="Request validation failed",
-                detail=_json_safe(exc.errors()),
+                detail=_json_safe([{k:v for k,v in error.items() if k not in ('input','ctx')} for error in exc.errors()]
+                    if '/data-sources' in request.url.path else exc.errors()),
                 error_code="VALIDATION_ERROR",
             ),
         )

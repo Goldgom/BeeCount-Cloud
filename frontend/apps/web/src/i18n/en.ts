@@ -67,6 +67,7 @@ const en = {
   'nav.transactions': 'Transactions',
   'nav.calendar': 'Calendar',
   'nav.accounts': 'Accounts',
+  'nav.dataSources': 'Data sources',
   'nav.categories': 'Categories',
   'nav.tags': 'Tags',
   'nav.budgets': 'Budgets',

@@ -15,6 +15,7 @@ import { clearCursor } from './state/sync-client'
 const TransactionsPage = lazy(() =>
   import('./pages/sections/TransactionsPage').then((m) => ({ default: m.TransactionsPage })),
 )
+const DataSourcesPage = lazy(() => import('./pages/sections/DataSourcesPage').then((m) => ({ default: m.DataSourcesPage })))
 const FinancePage = lazy(() => import('./pages/sections/FinancePage').then((m) => ({ default: m.FinancePage })))
 const AccountsPage = lazy(() =>
   import('./pages/sections/AccountsPage').then((m) => ({ default: m.AccountsPage })),
@@ -342,6 +343,7 @@ function AppRoutes() {
           }
         />
         <Route path="finance" element={<Suspense fallback={<RouteFallback />}><FinancePage /></Suspense>} />
+        <Route path="data-sources" element={<Suspense fallback={<RouteFallback />}><DataSourcesPage /></Suspense>} />
         {/* legacy 深链 /app/:ledgerId/... 目前直接 fall-through 到 transactions */}
         <Route path="*" element={<Navigate to="/app/overview" replace />} />
       </Route>
