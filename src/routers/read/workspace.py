@@ -666,6 +666,11 @@ def list_workspace_accounts(
         expense_total = float(bucket.get("expense", 0.0)) if bucket else 0.0
         tx_count = int(bucket.get("count", 0)) if bucket else 0
         movement = float(bucket.get("balance", 0.0)) if bucket else 0.0
+        from ...services.finance import events as finance_events, money as finance_money, utc as finance_utc
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        movement += sum(float(finance_money(e.effects.get(sync_id, 0)))
+                        for e in finance_events(db, acct.user_id) if finance_utc(e.effective_at) <= now)
         all_accounts.append(
             WorkspaceAccountOut(
                 id=sync_id,
@@ -1334,6 +1339,17 @@ def workspace_net_worth_history(
         .order_by(ReadTxProjection.happened_at.asc())
     ).all()
 
+    # Merge cloud financial postings chronologically into the legacy cash history.
+    # This remains a reconstructed cash series, NOT immutable historical valuations.
+    from ...services.finance import events as finance_events
+    from types import SimpleNamespace
+    txs = list(txs)
+    for event in finance_events(db, current_user.id):
+        for account_id, amount in event.effects.items():
+            txs.append(SimpleNamespace(tx_type='adjustment', amount=float(amount),
+                happened_at=event.effective_at, account_sync_id=account_id,
+                from_account_sync_id=None, to_account_sync_id=None))
+    txs.sort(key=lambda tx: _to_utc(tx.happened_at) if tx.happened_at else datetime.min.replace(tzinfo=timezone.utc))
     bal = dict(init_by_acc)
 
     def _apply(tx_type, amt, acc, from_acc, to_acc):

@@ -628,7 +628,11 @@ class InvestmentProduct(Base):
     account_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     account_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     quantity: Mapped[float] = mapped_column(Float, default=0.0)
-    cost_basis: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_basis: Mapped[float | None] = mapped_column(Float, nullable=True)
+    valuation_mode: Mapped[str] = mapped_column(String(32), default="shares_nav", server_default="shares_nav")
+    snapshot_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    snapshot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    valuation_source: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Money-market funds use confirmed shares at a fixed NAV of 1.0000.  The
     # principal is tracked separately so reinvested dividends lower effective
     # cost instead of being mistaken for new subscriptions.
@@ -846,3 +850,6 @@ class BackupRunTarget(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     bytes_transferred: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+# Register cloud-only finance journal.
+from . import models_finance  # noqa: E402,F401

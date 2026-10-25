@@ -106,8 +106,8 @@ export function AppHeader({ onOpenLogs, onOpenAbout }: Props) {
   }
 
   return (
-    <div className="sticky top-0 z-50 px-2 pb-2 pt-3 md:px-6 md:pt-4">
-      <header className="card px-2 md:px-5">
+    <div className="bc-app-header sticky top-0 z-50">
+      <header className="mx-auto px-4 md:px-6">
         <div className="flex h-14 items-center justify-between gap-2 md:gap-3">
           <div className="flex min-w-0 items-center gap-1.5 md:gap-2.5">
             <button
@@ -170,12 +170,13 @@ export function AppHeader({ onOpenLogs, onOpenAbout }: Props) {
             )}
           </div>
 
-          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
+          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex lg:hidden">
             {headerCoreItems.map((item) => {
               const active = currentSection === item.key
               return (
                 <button
                   key={item.key}
+                  aria-current={active ? 'page' : undefined}
                   className="relative"
                   type="button"
                   onClick={() => goToSection(item.key)}
@@ -183,7 +184,7 @@ export function AppHeader({ onOpenLogs, onOpenAbout }: Props) {
                   <span
                     className={`absolute inset-0 rounded-xl transition-all ${
                       active
-                        ? 'bg-[linear-gradient(135deg,hsl(var(--primary)/0.14),hsl(var(--primary)/0.04),hsl(var(--secondary)/0.12))] ring-1 ring-primary/20 shadow-[0_8px_24px_-18px_hsl(var(--primary)/0.55)]'
+                        ? 'bg-muted'
                         : 'bg-transparent'
                     }`}
                   />
@@ -205,7 +206,7 @@ export function AppHeader({ onOpenLogs, onOpenAbout }: Props) {
                   <button
                     className={`relative rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all ${
                       moreMenuActive
-                        ? 'bg-[linear-gradient(135deg,hsl(var(--primary)/0.14),hsl(var(--primary)/0.04),hsl(var(--secondary)/0.12))] text-foreground ring-1 ring-primary/20 shadow-[0_8px_24px_-18px_hsl(var(--primary)/0.55)]'
+                        ? 'bg-muted text-foreground'
                         : 'text-muted-foreground hover:bg-primary/15 hover:text-primary'
                     }`}
                     aria-label={t('shell.more')}

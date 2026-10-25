@@ -104,11 +104,16 @@ describe('asset aggregation — 绝不跨币种相加', () => {
 describe('effectiveRateToBase', () => {
   // 构造辅助
   function auto(rates: Record<string, string>, rateDate = '2025-01-01'): ExchangeRatesResponse {
-    return { rates, rate_date: rateDate } as ExchangeRatesResponse
+    return { base: 'CNY', rates, rate_date: rateDate } as ExchangeRatesResponse
   }
   function ov(base_currency: string, quote_currency: string, rate: string): ExchangeRateOverride {
     return { base_currency, quote_currency, rate } as ExchangeRateOverride
   }
+
+  it('rejects stale cached rates belonging to another base currency', () => {
+    const rates = { base: 'USD', rates: { EUR: '2' }, rate_date: '2026-10-25', source: 'test', fetched_at: '2026-10-25', stale: false } satisfies ExchangeRatesResponse
+    expect(effectiveRateToBase('EUR', 'CNY', rates, [])).toBeNull()
+  })
 
   it('① quote === base → rate 1, source auto', () => {
     const result = effectiveRateToBase('CNY', 'CNY', null, [])
@@ -177,7 +182,7 @@ describe('mergeGroupsToBase — 折算合并构成', () => {
     }
   }
   function auto(rates: Record<string, string>): ExchangeRatesResponse {
-    return { rates, rate_date: '2025-01-01' } as ExchangeRatesResponse
+    return { base: 'CNY', rates, rate_date: '2025-01-01' } as ExchangeRatesResponse
   }
 
   it('各币种同类型按汇率折算后跨币种合并到主币种', () => {

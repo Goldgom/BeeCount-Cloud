@@ -112,23 +112,8 @@ export function HomeHero({
     // overflow-visible:hero 内的 InsightsRow chip 用 popover 浮出详情,需要
     // 越出 hero 边界。装饰光斑挪到内层 overflow-hidden 子层去 clip。
     <div
-      className="relative rounded-2xl border border-primary/30"
-      style={{
-        background:
-          'linear-gradient(135deg, hsl(var(--primary)/0.18) 0%, hsl(var(--primary)/0.04) 55%, transparent 100%)'
-      }}
+      className="relative rounded-2xl border border-border/60 bg-card shadow-sm"
     >
-      {/* 装饰光斑容器 — 单独 overflow-hidden + inset-0 + rounded-2xl 跟父
-           容器对齐,光斑不漏到 hero 外。popover absolute 定位在 grid 容器
-           内,跟这层平级,不被 clip。 */}
-      <div
-        className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
-        aria-hidden
-      >
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/30 blur-3xl" />
-        <div className="absolute -left-24 bottom-0 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-      </div>
-
       {/* 窄屏 p-4 / 桌面 p-6:mobile 视口下 hero 体积大,内容只占一列时
            24px padding 显得很空,16px 紧凑但不挤。grid gap 同步收一点。 */}
       <div className="relative grid gap-4 p-4 sm:gap-5 sm:p-6 lg:grid-cols-[1.4fr_1fr]">
@@ -167,14 +152,14 @@ export function HomeHero({
             {scopeBalanceHint}
           </div>
           <Amount
-            value={balance}
+            value={activeSummary ? balance : null}
             showCurrency
             currency={currency}
             size="4xl"
             bold
             animate
-            tone={balance >= 0 ? 'positive' : 'negative'}
-            className="mt-1 block font-black tracking-tight"
+            tone="default"
+            className="mt-1 block font-semibold tracking-tight"
           />
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -185,7 +170,7 @@ export function HomeHero({
               style={{ animationDelay: '0ms' }}
             >
               <Amount
-                value={income}
+                value={activeSummary ? income : null}
                 currency={currency}
                 showCurrency
                 bold
@@ -203,7 +188,7 @@ export function HomeHero({
               style={{ animationDelay: '110ms' }}
             >
               <Amount
-                value={expense}
+                value={activeSummary ? expense : null}
                 currency={currency}
                 showCurrency
                 bold
@@ -254,7 +239,7 @@ export function HomeHero({
         </div>
 
         {/* 右侧：sparkline，随 scope 变 */}
-        <div className="flex min-h-[220px] flex-col gap-2 rounded-xl border border-border/40 bg-background/40 p-3 backdrop-blur-sm">
+        <div className="flex min-h-[220px] flex-col gap-2 rounded-xl border border-border/40 bg-muted/30 p-3 backdrop-blur-sm">
           <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
             <span>{t('home.hero.trend').replace('{scope}', scopeLabel)}</span>
             {trendData.length > 0 ? (
@@ -348,7 +333,7 @@ function ScopeSwitcher({
             onClick={() => onChange(scope)}
             className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
               active
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -375,7 +360,7 @@ function HeroStat({
 }) {
   return (
     <div
-      className={`rounded-xl border border-border/40 bg-background/50 px-3 py-2 backdrop-blur-sm${className ? ` ${className}` : ''}`}
+      className={`rounded-xl border border-border/40 bg-muted/40 px-3 py-2 backdrop-blur-sm${className ? ` ${className}` : ''}`}
       style={style}
     >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">

@@ -83,12 +83,15 @@ export function effectiveRateToBase(
   auto: ExchangeRatesResponse | null,
   overrides: ExchangeRateOverride[]
 ): { rate: number; source: 'manual' | 'auto'; date?: string } | null {
+  quote = quote.trim().toUpperCase()
+  base = base.trim().toUpperCase()
   if (quote === base) return { rate: 1, source: 'auto' }
-  const ov = overrides.find((o) => o.base_currency === base && o.quote_currency === quote)
+  const ov = overrides.find((o) => o.base_currency.toUpperCase() === base && o.quote_currency.toUpperCase() === quote)
   if (ov) {
     const r = Number(ov.rate)
     return Number.isFinite(r) && r > 0 ? { rate: r, source: 'manual' } : null
   }
+  if (auto?.base?.toUpperCase() !== base) return null
   const raw = Number(auto?.rates?.[quote])
   if (!Number.isFinite(raw) || raw <= 0) return null
   return { rate: 1 / raw, source: 'auto', date: auto!.rate_date }

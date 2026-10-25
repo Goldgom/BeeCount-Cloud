@@ -250,6 +250,7 @@ export function OverviewPage() {
     void loadAccountsAndTags()
     void loadBudgets()
     void loadCategories()
+    void fetchInvestmentAssets(token).then(setInvestmentAssets).catch(() => setInvestmentAssets(null))
   })
 
   // 把 Top 卡片里只有 name 的点击事件反查成 WorkspaceCategory 后弹详情;

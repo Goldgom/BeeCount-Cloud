@@ -242,7 +242,7 @@ function renderAmount({
   chinese: boolean
   wanUnit: string
 }): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '-'
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
   const isNeg = value < 0
   const absVal = Math.abs(value)
   const cur = showCurrency ? currency || 'CNY' : null

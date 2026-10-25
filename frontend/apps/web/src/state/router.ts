@@ -14,6 +14,7 @@ export const APP_SECTIONS: AppSection[] = [
   'transactions',
   'calendar',
   'accounts',
+  'finance',
   'categories',
   'tags',
   'budgets',
@@ -37,6 +38,8 @@ function parseWorkspaceSection(parts: string[]): AppSection {
   switch (parts.join('/')) {
     case 'transactions':
       return 'transactions'
+    case 'finance':
+      return 'finance'
     case 'accounts':
       return 'accounts'
     case 'categories':
@@ -77,6 +80,8 @@ function parseRootSection(parts: string[]): AppSection {
       return 'transactions'
     case 'calendar':
       return 'calendar'
+    case 'finance':
+      return 'finance'
     case 'accounts':
       return 'accounts'
     case 'categories':
@@ -116,6 +121,8 @@ function parseLegacyLedgerSection(parts: string[]): AppSection {
       return 'transactions'
     case 'calendar':
       return 'calendar'
+    case 'finance':
+      return 'finance'
     case 'accounts':
       return 'accounts'
     case 'categories':
@@ -173,6 +180,7 @@ export function parseRoute(pathname: string): AppRoute {
   if (
     parts[1] === 'transactions' ||
     parts[1] === 'calendar' ||
+    parts[1] === 'finance' ||
     parts[1] === 'accounts' ||
     parts[1] === 'categories' ||
     parts[1] === 'tags' ||
@@ -202,6 +210,8 @@ export function routePath(route: AppRoute): string {
       return '/app/transactions'
     case 'calendar':
       return '/app/calendar'
+    case 'finance':
+      return '/app/finance'
     case 'accounts':
       return '/app/accounts'
     case 'categories':

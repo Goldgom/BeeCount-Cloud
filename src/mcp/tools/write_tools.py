@@ -691,7 +691,7 @@ async def delete_account(user: User, *, account_id: str, confirm: bool = False,
 
 
 async def create_investment_product(user: User, *, name: str, symbol: str,
-                                    quantity: float, cost_basis: float = 0,
+                                    quantity: float = 0, cost_basis: float | None = None,
                                     currency: str = "CNY", market: str | None = None,
                                     account_id: str | None = None,
                                     account_name: str | None = None,
@@ -700,25 +700,17 @@ async def create_investment_product(user: User, *, name: str, symbol: str,
                                     day_change: float | None = None,
                                     is_money_fund: bool = False,
                                     net_subscription_principal: float | None = None,
-                                    daily_income: float | None = None) -> dict[str, Any]:
-    if quantity < 0 or cost_basis < 0:
-        raise ValueError("quantity and cost_basis must be non-negative")
+                                    daily_income: float | None = None,
+                                    valuation_mode: str = "shares_nav",
+                                    snapshot_amount: float | None = None,
+                                    snapshot_at: datetime | None = None,
+                                    valuation_source: str | None = None) -> dict[str, Any]:
+    from ...routers.investment_products import InvestmentProductCreate, create_investment_product as create
+    payload = locals().copy(); payload.pop("user")
+    payload = {k: v for k, v in payload.items() if k not in {"InvestmentProductCreate", "create"}}
     with SessionLocal() as db:
-        account = _resolve_investment_account(db, user.id, account_id, account_name)
-        principal = net_subscription_principal if is_money_fund else None
-        effective_cost = cost_basis
-        if is_money_fund:
-            principal = quantity * cost_basis if principal is None else principal
-            effective_cost = principal / quantity if quantity else 0.0
-        row = InvestmentProduct(id=str(uuid4()), user_id=user.id, name=name.strip(), symbol=symbol.strip().upper(),
-                                quantity=quantity, cost_basis=effective_cost, currency=currency.strip().upper(),
-                                market=market, account_id=account.sync_id, account_name=account.name,
-                                is_money_fund=is_money_fund, net_subscription_principal=principal,
-                                daily_income=daily_income, current_price=1.0 if is_money_fund else current_price,
-                                price_source="money_fund" if is_money_fund else ("manual" if current_price is not None else None),
-                                last_market_close=last_market_close, day_change=day_change)
-        db.add(row); db.commit(); db.refresh(row)
-        return {"status": "created", "id": row.id, "name": row.name, "symbol": row.symbol}
+        result = create(InvestmentProductCreate(**payload), current_user=user, db=db)
+        return {"status": "created", **result.model_dump(mode="json")}
 
 
 async def update_investment_product(user: User, *, product_id: str, name: str | None = None,
@@ -732,40 +724,18 @@ async def update_investment_product(user: User, *, product_id: str, name: str | 
                                     is_money_fund: bool | None = None,
                                     net_subscription_principal: float | None = None,
                                     daily_income: float | None = None,
-                                    use_auto_price: bool = False) -> dict[str, Any]:
+                                    use_auto_price: bool = False,
+                                    valuation_mode: str | None = None,
+                                    snapshot_amount: float | None = None,
+                                    snapshot_at: datetime | None = None,
+                                    valuation_source: str | None = None,
+                                    clear_cost_basis: bool = False) -> dict[str, Any]:
+    from ...routers.investment_products import InvestmentProductPatch, update_investment_product as update
+    payload = locals().copy(); payload.pop("user"); payload.pop("product_id")
+    payload = {k: v for k, v in payload.items() if v is not None and k not in {"InvestmentProductPatch", "update"}}
     with SessionLocal() as db:
-        row = db.scalar(select(InvestmentProduct).where(InvestmentProduct.id == product_id, InvestmentProduct.user_id == user.id))
-        if row is None: raise ValueError("Investment product not found")
-        if account_id is not None or account_name is not None:
-            account = _resolve_investment_account(db, user.id, account_id, account_name)
-            row.account_id, row.account_name = account.sync_id, account.name
-        if use_auto_price:
-            row.current_price = None
-            row.price_source = None
-            row.last_market_close = None
-            row.day_change = None
-        for key, value in (("name", name), ("symbol", symbol), ("quantity", quantity), ("cost_basis", cost_basis),
-                           ("currency", currency), ("market", market), ("current_price", current_price),
-                           ("is_money_fund", is_money_fund), ("net_subscription_principal", net_subscription_principal), ("daily_income", daily_income),
-                           ("last_market_close", last_market_close), ("day_change", day_change)):
-            if value is not None: setattr(row, key, value.upper() if key in {"symbol", "currency"} else value)
-        if current_price is not None:
-            row.price_source = "manual"
-            row.last_market_close = last_market_close
-            row.day_change = day_change
-        if is_money_fund is True or (is_money_fund is None and row.is_money_fund):
-            row.is_money_fund = True
-            row.current_price, row.price_source = 1.0, "money_fund"
-            if row.net_subscription_principal is None:
-                row.net_subscription_principal = float(row.quantity or 0) * float(row.cost_basis or 1.0)
-            row.cost_basis = float(row.net_subscription_principal) / float(row.quantity) if row.quantity else 0.0
-        elif is_money_fund is False:
-            row.is_money_fund = False
-            if current_price is None:
-                row.current_price = row.last_market_close = row.day_change = None
-                row.price_source = None
-        row.updated_at = datetime.now(timezone.utc); db.commit()
-        return {"status": "updated", "id": row.id}
+        result = update(product_id, InvestmentProductPatch(**payload), current_user=user, db=db)
+        return {"status": "updated", **result.model_dump(mode="json")}
 
 
 async def delete_investment_product(user: User, *, product_id: str, confirm: bool = False) -> dict[str, Any]:

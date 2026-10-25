@@ -398,8 +398,8 @@ async def delete_account(ctx: Context, account_id: str, confirm: bool = False,
 
 
 @mcp.tool()
-async def create_investment_product(ctx: Context, name: str, symbol: str, quantity: float,
-                                    cost_basis: float = 0, currency: str = "CNY",
+async def create_investment_product(ctx: Context, name: str, symbol: str, quantity: float = 0,
+                                    cost_basis: float | None = None, currency: str = "CNY",
                                     market: str | None = None, account_id: str | None = None,
                                     account_name: str | None = None,
                                     current_price: float | None = None,
@@ -407,7 +407,11 @@ async def create_investment_product(ctx: Context, name: str, symbol: str, quanti
                                     day_change: float | None = None,
                                     is_money_fund: bool = False,
                                     net_subscription_principal: float | None = None,
-                                    daily_income: float | None = None) -> dict[str, Any]:
+                                    daily_income: float | None = None,
+                                    valuation_mode: str = "shares_nav",
+                                    snapshot_amount: float | None = None,
+                                    snapshot_at: str | None = None,
+                                    valuation_source: str | None = None) -> dict[str, Any]:
     """Record a holding bound to one of the user's investment accounts.
 
     ``account_id`` is the stable investment-account id and is required. Legacy
@@ -435,7 +439,12 @@ async def update_investment_product(ctx: Context, product_id: str, name: str | N
                                     is_money_fund: bool | None = None,
                                     net_subscription_principal: float | None = None,
                                     daily_income: float | None = None,
-                                    use_auto_price: bool = False) -> dict[str, Any]:
+                                    use_auto_price: bool = False,
+                                    valuation_mode: str | None = None,
+                                    snapshot_amount: float | None = None,
+                                    snapshot_at: str | None = None,
+                                    valuation_source: str | None = None,
+                                    clear_cost_basis: bool = False) -> dict[str, Any]:
     """Update a holding, including moving it to a different investment account.
 
     Set ``use_auto_price=true`` to clear a manual price and resume the free
@@ -636,5 +645,7 @@ def _build_app():
 
 
 # 模块级 ASGI app:`src.main` 直接 `app.mount(prefix, mcp_server.app)`。
+from .tools.finance_tools import register as register_finance_tools
+register_finance_tools(mcp, _logged_call)
 app = _build_app()
 # reload trigger

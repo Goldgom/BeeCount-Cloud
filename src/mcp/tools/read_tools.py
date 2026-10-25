@@ -254,13 +254,15 @@ def list_accounts(user: User, *, account_type: str | None = None) -> list[dict[s
                 balances[tx.from_account_name] -= float(tx.amount or 0)
             if tx.to_account_name in balances:
                 balances[tx.to_account_name] += float(tx.amount or 0)
+        from ...services.finance import account_balances
+        canonical = account_balances(db, user_id=user.id)
         return [
             {
                 "name": r.name,
                 "account_type": r.account_type,
                 "currency": r.currency,
                 "initial_balance": float(r.initial_balance or 0),
-                "balance": round(balances.get(r.name or "", 0.0), 2),
+                "balance": round(canonical[r.sync_id]['cash_balance'], 2),
                 "id": r.sync_id,
                 "bank_name": r.bank_name,
                 "card_last_four": r.card_last_four,
@@ -273,93 +275,9 @@ def list_accounts(user: User, *, account_type: str | None = None) -> list[dict[s
 
 
 async def get_investment_assets(user: User, *, refresh: bool = True) -> dict[str, Any]:
-    """Return holdings and each investment account's cash + holding assets."""
-    from ...services.investment_price import fetch_price
-    from ...services.exchange_rate import fetcher
+    from ...services.investment_valuation import investment_assets
     with SessionLocal() as db:
-        rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == user.id).order_by(InvestmentProduct.name)).all()
-        profile_currency = db.scalar(select(UserProfile.primary_currency).where(UserProfile.user_id == user.id)) or "CNY"
-        items: list[dict[str, Any]] = []
-        total = 0.0
-        total_daily_pnl = 0.0
-        account_values = investment_account_cash_balances(db, user_id=user.id)
-        account_items: dict[str, list[dict[str, Any]]] = {key: [] for key in account_values}
-        account_market_values = {key: 0.0 for key in account_values}
-        account_daily_pnls = {key: 0.0 for key in account_values}
-        for row in rows:
-            price = row.current_price
-            source = row.price_source or "manual"
-            last_close = row.last_market_close
-            day_change = row.day_change
-            quote: dict[str, Any] = {}
-            if refresh and (row.is_money_fund or row.price_source != "manual"):
-                try:
-                    quote = await fetch_price(row.symbol, "fund" if row.is_money_fund else row.market)
-                    price, source = quote["price"], quote["source"]
-                    last_close = quote.get("previous_close", last_close)
-                    day_change = quote.get("day_change", day_change)
-                    row.current_price, row.price_source, row.price_updated_at = price, source, datetime.now(timezone.utc)
-                    row.last_market_close, row.day_change = last_close, day_change
-                    db.commit()
-                except Exception:
-                    pass
-            # Keep automatic pricing retryable, but never value an unquoted
-            # holding at zero: cost_basis is the deterministic fallback.
-            valuation_price = 1.0 if row.is_money_fund else (float(price) if price is not None else float(row.cost_basis or 0))
-            if price is None and row.price_source != "manual":
-                source = "cost_basis_fallback"
-            value = float(row.quantity or 0) * valuation_price
-            daily_pnl = float(row.daily_income or 0) if row.is_money_fund else float(row.quantity or 0) * float(day_change or 0)
-            if row.is_money_fund and refresh:
-                per_10000 = quote.get("daily_income_per_10000")
-                if per_10000 is not None:
-                    daily_pnl = float(row.quantity or 0) / 10000.0 * float(per_10000)
-            principal = float(row.net_subscription_principal) if row.is_money_fund and row.net_subscription_principal is not None else float(row.quantity or 0) * float(row.cost_basis or 0)
-            holding_pnl = (value - principal) if row.is_money_fund else float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
-            total_daily_pnl += daily_pnl
-            native = value
-            ccy = (row.currency or profile_currency).upper()
-            if ccy != profile_currency:
-                try:
-                    rate_row, _ = await fetcher.get_rates(db, profile_currency)
-                    rate = float(dict(rate_row.payload_json).get(ccy, 0) or 0)
-                    native = value / rate if rate > 0 else value
-                except Exception:
-                    native = value
-            total += native
-            item = {"id": row.id, "name": row.name, "symbol": row.symbol, "market": row.market,
-                          "currency": ccy, "account_id": row.account_id, "account_name": row.account_name, "quantity": row.quantity,
-                          "cost_basis": row.cost_basis, "price": valuation_price, "price_source": source,
-                          "price_mode": "manual" if source == "manual" else "auto",
-                          "price_status": ("manual" if row.price_source == "manual" else "live" if price is not None else "fallback"),
-                          "last_market_close": last_close, "day_change": day_change,
-                          "cost_basis_total": round(float(row.cost_basis or 0), 2),
-                          "price_updated_at": row.price_updated_at.isoformat() if row.price_updated_at else None,
-                          "market_value": round(value, 2), "market_value_base": round(native, 2),
-                          "daily_pnl": round(daily_pnl, 2), "holding_pnl": round(holding_pnl, 2)}
-            item["is_money_fund"] = bool(row.is_money_fund)
-            item["daily_income"] = round(daily_pnl, 2) if row.is_money_fund else row.daily_income
-            items.append(item)
-            if row.account_id in account_values:
-                account_items[row.account_id].append(item)
-                account_market_values[row.account_id] += value
-                account_daily_pnls[row.account_id] += daily_pnl
-        investment_accounts = [
-            {
-                **data,
-                "cash_balance": round(float(data["cash_balance"]), 2),
-                "holdings_market_value": round(account_market_values[account_id], 2),
-                "total_assets": round(float(data["cash_balance"]) + account_market_values[account_id], 2),
-                "daily_pnl": round(account_daily_pnls[account_id], 2),
-                "items": account_items[account_id],
-            }
-            for account_id, data in account_values.items()
-        ]
-        total_cash = sum(float(data["cash_balance"]) for data in account_values.values())
-        return {"base_currency": profile_currency, "total_market_value": round(total, 2),
-                "total_daily_pnl": round(total_daily_pnl, 2), "total_cash_balance": round(total_cash, 2),
-                "total_assets": round(total + total_cash, 2), "investment_accounts": investment_accounts,
-                "items": items}
+        return await investment_assets(db, user.id, refresh)
 
 
 def list_investment_products(user: User) -> list[dict[str, Any]]:
@@ -368,6 +286,9 @@ def list_investment_products(user: User) -> list[dict[str, Any]]:
         return [{"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
                  "currency": r.currency, "account_id": r.account_id, "account_name": r.account_name,
                  "quantity": r.quantity, "cost_basis": r.cost_basis,
+                 "valuation_mode": "money_fund" if r.is_money_fund else r.valuation_mode,
+                 "snapshot_amount": r.snapshot_amount, "snapshot_at": r.snapshot_at.isoformat() if r.snapshot_at else None,
+                 "valuation_source": r.valuation_source,
                  "current_price": r.current_price,
                  "price_mode": "manual" if r.price_source == "manual" else "auto",
                  "is_money_fund": bool(r.is_money_fund), "net_subscription_principal": r.net_subscription_principal,
@@ -385,6 +306,9 @@ def get_investment_product(user: User, product_id: str) -> dict[str, Any] | None
         return {"id": r.id, "name": r.name, "symbol": r.symbol, "market": r.market,
                 "currency": r.currency, "account_id": r.account_id, "account_name": r.account_name, "quantity": r.quantity,
                 "cost_basis": r.cost_basis, "current_price": r.current_price,
+                "valuation_mode": "money_fund" if r.is_money_fund else r.valuation_mode,
+                "snapshot_amount": r.snapshot_amount, "snapshot_at": r.snapshot_at.isoformat() if r.snapshot_at else None,
+                "valuation_source": r.valuation_source,
                 "price_mode": "manual" if r.price_source == "manual" else "auto",
                 "is_money_fund": bool(r.is_money_fund), "net_subscription_principal": r.net_subscription_principal,
                 "daily_income": r.daily_income,

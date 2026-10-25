@@ -54,7 +54,7 @@ type MobileStyleAssetsProps = {
   hideCurrencyCards?: boolean
   /** Bound holding market value by investment account id.  Cash remains on the
    * account row; tiles add this amount once to show the account's total value. */
-  investmentValuations?: Record<string, number>
+  investmentValuations?: Record<string, number | null>
   /** Per investment account quote state: manual or fallback (yellow warning). */
   investmentPriceStatuses?: Record<string, 'manual' | 'fallback' | 'live'>
   /** 账户隐藏(issue #240):底部「已隐藏」分区里,每张隐藏卡的快捷「恢复」
@@ -204,7 +204,7 @@ function MobileStyleAssets({
                       color={group.color}
                       isLiability={group.isLiability}
                       canManage={canManage}
-                      investmentValuation={investmentValuations[row.id] ?? 0}
+                      investmentValuation={investmentValuations[row.id] ?? null}
                       investmentPriceStatus={investmentPriceStatuses[row.id]}
                       onEdit={() => onEdit(row)}
                       onDelete={onDelete ? () => onDelete(row) : undefined}
@@ -567,7 +567,7 @@ function BankCardTile({
   color,
   isLiability,
   canManage,
-  investmentValuation = 0,
+  investmentValuation = null,
   investmentPriceStatus,
   onEdit,
   onDelete,
@@ -577,7 +577,7 @@ function BankCardTile({
   color: string
   isLiability: boolean
   canManage: boolean
-  investmentValuation?: number
+  investmentValuation?: number | null
   investmentPriceStatus?: 'manual' | 'fallback' | 'live'
   onEdit: () => void
   onDelete?: () => void
@@ -595,7 +595,7 @@ function BankCardTile({
   const displayBalance = hasStats ? (row.balance as number) : row.initial_balance ?? 0
   // 估值账户：负债显示绝对值欠款，资产显示当前估值。
   const valuationValue = isLiability ? Math.abs(displayBalance) : displayBalance
-  const totalInvestmentValue = displayBalance + investmentValuation
+  const totalInvestmentValue = investmentValuation === null ? null : displayBalance + investmentValuation
   // 信用卡：按负债展示。已用 = max(0, -balance),可用 = 额度 - 已用(对齐 mobile）。
   const isCreditCard = accountType === 'credit_card'
   const ccLimit = typeof row.credit_limit === 'number' ? row.credit_limit : null
@@ -604,100 +604,43 @@ function BankCardTile({
   const recentNet = (row.income_total ?? 0) - (row.expense_total ?? 0)
   const bankName = row.bank_name?.trim() || ''
   const bankMark = bankName ? bankName.slice(0, 2).toUpperCase() : accountType === 'credit_card' ? 'CC' : 'BK'
-  const quoteOverlay = accountType === 'investment' && investmentPriceStatus === 'fallback'
-    ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.92), rgba(234, 179, 8, 0.78)), '
-    : accountType === 'investment' && investmentPriceStatus === 'manual'
-      ? 'linear-gradient(135deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.18)), '
-      : ''
-
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg ${
-        onClick ? 'cursor-pointer' : ''
-      }`}
-      style={{
-        // 比 16:10 稍高一点，正文能放三列 stats 不挤。
-        aspectRatio: '16 / 10',
-        background: `${quoteOverlay}linear-gradient(135deg, ${color} 0%, ${color}d9 40%, ${color}99 75%, ${color}66 100%)`,
-        boxShadow: `0 4px 12px -4px ${color}66, 0 1px 2px rgba(0,0,0,0.06)`
-      }}
+      className={`group relative min-h-[180px] overflow-hidden rounded-2xl border border-border/60 bg-card text-foreground transition-colors hover:border-primary/40 ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? 'button' : undefined}
+      aria-label={row.name}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onClick?.() }
+      }}
     >
-      {/* 装饰 1：右上大圆（mobile 同款） */}
-      <div
-        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-white/15"
-        aria-hidden
-      />
-      {/* 装饰 2：左下小圆，对角呼应 */}
-      <div
-        className="pointer-events-none absolute -left-6 -bottom-10 h-20 w-20 rounded-full bg-white/10"
-        aria-hidden
-      />
-      {/* 装饰 3：radial highlight */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            'radial-gradient(circle at 30% 20%, rgba(255,255,255,0.22) 0%, transparent 55%)'
-        }}
-        aria-hidden
-      />
-      {/* 装饰 4：斜向细纹（激光蚀刻花纹） */}
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.12] mix-blend-overlay"
-        viewBox="0 0 160 110"
-        preserveAspectRatio="none"
-        aria-hidden
-      >
-        <defs>
-          <pattern
-            id={`card-grid-${row.id}`}
-            width="12"
-            height="12"
-            patternUnits="userSpaceOnUse"
-            patternTransform="rotate(25)"
-          >
-            <path d="M0 0 L12 0" stroke="#fff" strokeWidth="0.5" opacity="0.6" />
-          </pattern>
-        </defs>
-        <rect width="160" height="110" fill={`url(#card-grid-${row.id})`} />
-      </svg>
-      {/* 装饰 5：斜向磨砂反光条 */}
-      <div
-        className="pointer-events-none absolute -left-1/4 top-0 h-full w-1/2 opacity-30"
-        style={{
-          background:
-            'linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)'
-        }}
-        aria-hidden
-      />
-
-      <div className="relative flex h-full flex-col p-2.5">
+      <div className="relative flex h-full flex-col p-4">
         {/* 顶部：类型图标 + 账户名 + 币种 pill */}
         <div className="flex items-center gap-1.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/95 shadow-sm ring-1 ring-white/50">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
             {accountType === 'bank_card' || accountType === 'credit_card' ? (
               <span className="text-[10px] font-black tracking-tight" style={{ color }}>{bankMark}</span>
             ) : <TypeIcon type={accountType} size={18} />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold leading-tight drop-shadow-sm">
+            <div className="truncate text-[12px] font-semibold leading-tight ">
               {row.name}
             </div>
             {accountType === 'investment' && (row.investment_product_name || row.investment_product_symbol) ? (
-              <div className="truncate text-[9px] text-white/80">
+              <div className="truncate text-[9px] text-muted-foreground">
                 {row.investment_product_name || ''}
                 {row.investment_product_symbol ? ` · ${row.investment_product_symbol}` : ''}
               </div>
             ) : null}
           </div>
-          <span className="shrink-0 rounded bg-white/25 px-1 py-[1px] text-[9px] font-semibold tracking-wider">
+          <span className="shrink-0 rounded bg-muted px-1 py-[1px] text-[9px] font-semibold tracking-wider">
             {currency}
           </span>
         </div>
 
         {(accountType === 'bank_card' || accountType === 'credit_card') && (bankName || row.card_last_four) ? (
-          <div className="mt-2 flex items-center justify-between text-[10px] text-white/80">
+          <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
             <span className="truncate">{bankName || t('accounts.bankcard.unknownBank')}</span>
             {row.card_last_four ? <span className="font-mono tracking-[0.16em]">•••• {row.card_last_four}</span> : null}
           </div>
@@ -705,7 +648,7 @@ function BankCardTile({
 
         {/* 正文：按类型切换布局 */}
         {accountType === 'investment' ? (
-          <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-black/15 px-2 py-1.5 backdrop-blur-[1px]">
+          <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-muted/50 px-2 py-1.5 backdrop-blur-[1px]">
             <StatCell
               label={t('accounts.bankcard.balance')}
               value={displayBalance}
@@ -726,9 +669,9 @@ function BankCardTile({
         ) : isValuation ? (
           <div className="mt-auto">
             {accountType === 'investment' && row.investment_product_market ? (
-              <div className="mb-1 text-[9px] text-white/70">{row.investment_product_market}</div>
+              <div className="mb-1 text-[9px] text-muted-foreground">{row.investment_product_market}</div>
             ) : null}
-            <div className="text-[9px] uppercase tracking-[0.15em] text-white/75">
+            <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
               {isLiability ? t('accounts.bankcard.currentOwed') : t('accounts.bankcard.currentValue')}
             </div>
             <Amount
@@ -736,12 +679,12 @@ function BankCardTile({
               currency={currency}
               showCurrency
               bold
-              className="mt-0.5 block text-[24px] leading-tight drop-shadow text-white"
+              className="mt-0.5 block text-[24px] leading-tight  text-foreground"
             />
           </div>
         ) : isCreditCard ? (
           ccLimit !== null ? (
-            <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-black/15 px-2 py-1.5 backdrop-blur-[1px]">
+            <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-muted/50 px-2 py-1.5 backdrop-blur-[1px]">
               <StatCell
                 label={t('accounts.field.creditLimit')}
                 value={ccLimit}
@@ -760,7 +703,7 @@ function BankCardTile({
             </div>
           ) : (
             <div className="mt-auto">
-              <div className="text-[9px] uppercase tracking-[0.15em] text-white/75">
+              <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
                 {t('accounts.bankcard.currentOwed')}
               </div>
               <Amount
@@ -768,12 +711,12 @@ function BankCardTile({
                 currency={currency}
                 showCurrency
                 bold
-                className="mt-0.5 block text-[18px] leading-tight drop-shadow text-white"
+                className="mt-0.5 block text-[18px] leading-tight  text-foreground"
               />
             </div>
           )
         ) : hasStats ? (
-          <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-black/15 px-2 py-1.5 backdrop-blur-[1px]">
+          <div className="mt-auto grid grid-cols-3 gap-1 rounded-md bg-muted/50 px-2 py-1.5 backdrop-blur-[1px]">
             <StatCell
               label={t('accounts.bankcard.balance')}
               value={displayBalance}
@@ -793,7 +736,7 @@ function BankCardTile({
           </div>
         ) : (
           <div className="mt-auto">
-            <div className="text-[9px] uppercase tracking-[0.15em] text-white/75">
+            <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
               {isLiability ? t('accounts.bankcard.owedLabel') : t('accounts.bankcard.balanceLabel')}
             </div>
             <Amount
@@ -801,13 +744,13 @@ function BankCardTile({
               currency={currency}
               showCurrency
               bold
-              className="mt-0.5 block text-[16px] leading-tight drop-shadow text-white"
+              className="mt-0.5 block text-[16px] leading-tight  text-foreground"
             />
           </div>
         )}
         {(accountType === 'bank_card' || accountType === 'credit_card') && hasStats ? (
-          <div className="mt-2 flex items-center justify-between rounded-md bg-black/15 px-2 py-1 text-[10px] backdrop-blur-[1px]">
-            <span className="text-white/70">{t('accounts.bankcard.recentChange')}</span>
+          <div className="mt-2 flex items-center justify-between rounded-md bg-muted/50 px-2 py-1 text-[10px] backdrop-blur-[1px]">
+            <span className="text-muted-foreground">{t('accounts.bankcard.recentChange')}</span>
             <span className={recentNet >= 0 ? 'font-semibold text-emerald-100' : 'font-semibold text-amber-100'}>{recentNet >= 0 ? '+' : ''}{recentNet.toFixed(2)}</span>
           </div>
         ) : null}
@@ -822,7 +765,7 @@ function BankCardTile({
             event.stopPropagation()
             onEdit()
           }}
-          className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] text-white backdrop-blur hover:bg-primary/80"
+          className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] text-foreground backdrop-blur hover:bg-primary/80"
         >
           {t('common.edit')}
         </button>
@@ -834,7 +777,7 @@ function BankCardTile({
               event.stopPropagation()
               onDelete()
             }}
-            className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] text-white backdrop-blur hover:bg-destructive/60"
+            className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] text-foreground backdrop-blur hover:bg-destructive/60"
           >
             {t('common.delete')}
           </button>
@@ -851,21 +794,21 @@ function StatCell({
   tone = 'default'
 }: {
   label: string
-  value: number
+  value: number | null
   currency: string
   tone?: 'default' | 'warn'
 }) {
   return (
     <div className="flex min-w-0 flex-col items-start gap-[1px]">
-      <span className="text-[9px] uppercase tracking-wider text-white/70">{label}</span>
+      <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</span>
       <Amount
         value={value}
         currency={currency}
         showCurrency={false}
         bold
         size="xs"
-        className={`leading-tight drop-shadow-sm ${
-          tone === 'warn' ? 'text-amber-100' : 'text-white'
+        className={`leading-tight  ${
+          tone === 'warn' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'
         }`}
       />
     </div>
@@ -1083,7 +1026,7 @@ type AccountsPanelProps = {
   /** true 时跳过多币种「每币种一张卡」网格区(用于折算汇总视图);缺省 false,
    *  其它调用方零影响。详见 MobileStyleAssets。 */
   hideCurrencyCards?: boolean
-  investmentValuations?: Record<string, number>
+  investmentValuations?: Record<string, number | null>
   investmentPriceStatuses?: Record<string, 'manual' | 'fallback' | 'live'>
   /** 账户隐藏(issue #240):底部「已隐藏」分区每张卡的快捷「恢复」按钮回调。
    *  不传则该按钮不渲染(调用方尚未接线时零影响)。 */

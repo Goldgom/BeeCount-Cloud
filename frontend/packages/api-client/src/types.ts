@@ -757,6 +757,13 @@ export type ExchangeRatesResponse = {
   rates: Record<string, string>
 }
 
+export type InvestmentFx = {
+  status: string
+  stale?: boolean
+  rate?: number | null
+  path?: { from_currency: string; to_currency: string; rate: number; source: string; rate_date?: string | null; fetched_at?: string | null; stale?: boolean }[]
+}
+
 export type InvestmentHolding = {
   id: string
   name: string
@@ -766,18 +773,29 @@ export type InvestmentHolding = {
   account_id: string | null
   account_name: string | null
   quantity: number
-  cost_basis: number
+  cost_basis: number | null
   current_price: number | null
   last_market_close: number | null
   day_change: number | null
   price_mode: 'manual' | 'auto'
-  price_status?: 'manual' | 'live' | 'fallback'
+  price_status?: 'manual' | 'live' | 'fallback' | 'snapshot' | 'missing'
   is_money_fund?: boolean
   net_subscription_principal?: number | null
   daily_income?: number | null
-  market_value: number
-  daily_pnl: number
-  holding_pnl: number
+  market_value: number | null
+  daily_pnl: number | null
+  holding_pnl: number | null
+  market_value_base?: number | null
+  daily_pnl_base?: number | null
+  holding_pnl_base?: number | null
+  cost_basis_total?: number | null
+  valuation_mode?: 'shares_nav' | 'amount_snapshot' | 'money_fund'
+  snapshot_amount?: number | null
+  snapshot_at?: string | null
+  valuation_source?: string | null
+  as_of?: string | null
+  price_updated_at?: string | null
+  fx?: InvestmentFx
 }
 
 export type InvestmentAccountAssets = {
@@ -785,18 +803,54 @@ export type InvestmentAccountAssets = {
   account_name: string
   currency: string
   cash_balance: number
-  holdings_market_value: number
-  total_assets: number
-  daily_pnl: number
+  holdings_market_value: number | null
+  total_assets: number | null
+  daily_pnl: number | null
+  cash_balance_base?: number | null
+  holdings_market_value_base?: number | null
+  total_assets_base?: number | null
+  available_balance?: number | null
   items: InvestmentHolding[]
 }
 
 export type InvestmentAssetsResponse = {
   base_currency: string
-  total_market_value: number
-  total_daily_pnl: number
-  total_cash_balance: number
-  total_assets: number
+  total_market_value: number | null
+  total_daily_pnl: number | null
+  total_cash_balance: number | null
+  total_assets: number | null
+  known_market_value?: number
+  known_daily_pnl?: number
+  known_cash_balance?: number
+  known_total_assets?: number
+  scope?: 'investment_only'
+  all_assets_summary?: {
+    scope: 'all_assets'
+    base_currency: string
+    total_assets: number | null
+    net_equity: number | null
+    known_total_assets: number
+    available_balance: number | null
+    coverage: { components_total: number; components_valued: number; missing_component_ids: string[] }
+    completeness: 'complete' | 'partial'
+    as_of: string
+    as_of_status: string
+    valuation_times_complete: boolean
+    components: { id: string; kind: 'account_cash' | 'investment_holding' | 'receivable'; name: string; currency: string; amount: number | null; amount_base: number | null; fx?: InvestmentFx; as_of: string | null }[]
+  }
+  all_assets_total?: number | null
+  coverage?: {
+    holdings_total: number
+    holdings_valued: number
+    missing_holding_ids: string[]
+    cash_accounts_total: number
+    cash_accounts_valued: number
+    unbound_holding_ids: string[]
+  }
+  completeness?: 'complete' | 'partial'
+  as_of?: string
+  as_of_status?: string
+  valuation_times_complete?: boolean
   investment_accounts: InvestmentAccountAssets[]
   items: InvestmentHolding[]
 }

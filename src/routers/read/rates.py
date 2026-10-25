@@ -60,130 +60,15 @@ class ExchangeRatesOut(BaseModel):
     rates: dict[str, str]
 
 
-class InvestmentHoldingOut(BaseModel):
-    id: str
-    name: str
-    symbol: str
-    market: str | None = None
-    currency: str
-    account_id: str | None = None
-    account_name: str | None = None
-    quantity: float
-    cost_basis: float
-    current_price: float | None = None
-    last_market_close: float | None = None
-    day_change: float | None = None
-    price_mode: str
-    price_status: str = "live"  # manual | live | fallback (cost basis)
-    market_value: float
-    daily_pnl: float
-    holding_pnl: float
-    is_money_fund: bool = False
-    daily_income: float | None = None
-
-
-class InvestmentAccountAssetsOut(BaseModel):
-    account_id: str
-    account_name: str
-    currency: str
-    cash_balance: float
-    holdings_market_value: float
-    total_assets: float
-    daily_pnl: float
-    items: list[InvestmentHoldingOut]
-
-
-class InvestmentAssetsOut(BaseModel):
-    base_currency: str
-    # Kept for existing clients: value of holdings only.
-    total_market_value: float
-    total_daily_pnl: float
-    total_cash_balance: float
-    total_assets: float
-    investment_accounts: list[InvestmentAccountAssetsOut]
-    items: list[InvestmentHoldingOut]
-
-
-@router.get("/investment-assets", response_model=InvestmentAssetsOut)
+@router.get("/investment-assets")
 async def get_investment_assets(
     refresh: bool = Query(default=True),
     _scopes: set[str] = Depends(_READ_SCOPE_DEP),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> InvestmentAssetsOut:
-    from ...services.investment_price import fetch_price
-    rows = db.scalars(select(InvestmentProduct).where(InvestmentProduct.user_id == current_user.id).order_by(InvestmentProduct.name)).all()
-    base_currency = db.scalar(select(UserProfile.primary_currency).where(UserProfile.user_id == current_user.id)) or "CNY"
-    items: list[InvestmentHoldingOut] = []
-    total = total_pnl = 0.0
-    account_values = investment_account_cash_balances(db, user_id=current_user.id)
-    account_items: dict[str, list[InvestmentHoldingOut]] = {key: [] for key in account_values}
-    account_market_values = {key: 0.0 for key in account_values}
-    account_daily_pnls = {key: 0.0 for key in account_values}
-    for row in rows:
-        price, previous_close, day_change = row.current_price, row.last_market_close, row.day_change
-        quote: dict = {}
-        if refresh and (row.is_money_fund or row.price_source != "manual"):
-            try:
-                quote = await fetch_price(row.symbol, "fund" if row.is_money_fund else row.market)
-                price = quote.get("price")
-                previous_close = quote.get("previous_close", previous_close)
-                day_change = quote.get("day_change", day_change)
-                row.price_source = quote.get("source")
-                row.current_price = price
-                row.last_market_close = previous_close
-                row.day_change = day_change
-                db.commit()
-            except Exception:
-                pass
-        # An automatic quote may be unavailable (provider outage, unknown
-        # symbol, or an empty response).  Keep the row eligible for a future
-        # refresh, but value it at cost for this response instead of zero.
-        valuation_price = 1.0 if row.is_money_fund else (float(price) if price is not None else float(row.cost_basis or 0))
-        value = float(row.quantity or 0) * valuation_price
-        pnl = float(row.daily_income or 0) if row.is_money_fund else float(row.quantity or 0) * float(day_change or 0)
-        if row.is_money_fund and refresh:
-            per_10000 = quote.get("daily_income_per_10000")
-            if per_10000 is not None:
-                pnl = float(row.quantity or 0) / 10000.0 * float(per_10000)
-        principal = float(row.net_subscription_principal) if row.is_money_fund and row.net_subscription_principal is not None else float(row.quantity or 0) * float(row.cost_basis or 0)
-        holding_pnl = (value - principal) if row.is_money_fund else float(row.quantity or 0) * (valuation_price - float(row.cost_basis or 0))
-        total += value
-        total_pnl += pnl
-        item = InvestmentHoldingOut(
-            id=row.id, name=row.name, symbol=row.symbol, market=row.market,
-            currency=row.currency, account_id=row.account_id, account_name=row.account_name,
-            quantity=float(row.quantity or 0), cost_basis=float(row.cost_basis or 0),
-            current_price=valuation_price, last_market_close=previous_close, day_change=day_change,
-            price_mode="manual" if row.price_source == "manual" else "auto",
-            price_status=("manual" if row.price_source == "manual" else "live" if price is not None else "fallback"),
-            market_value=round(value, 2), daily_pnl=round(pnl, 2),
-            holding_pnl=round(holding_pnl, 2),
-            is_money_fund=bool(row.is_money_fund), daily_income=round(pnl, 2) if row.is_money_fund else row.daily_income,
-        )
-        items.append(item)
-        if row.account_id in account_values:
-            account_items[row.account_id].append(item)
-            account_market_values[row.account_id] += value
-            account_daily_pnls[row.account_id] += pnl
-    accounts = [
-        InvestmentAccountAssetsOut(
-            account_id=account_id,
-            account_name=str(data["account_name"]), currency=str(data["currency"]),
-            cash_balance=round(float(data["cash_balance"]), 2),
-            holdings_market_value=round(account_market_values[account_id], 2),
-            total_assets=round(float(data["cash_balance"]) + account_market_values[account_id], 2),
-            daily_pnl=round(account_daily_pnls[account_id], 2),
-            items=account_items[account_id],
-        )
-        for account_id, data in account_values.items()
-    ]
-    total_cash = sum(float(item["cash_balance"]) for item in account_values.values())
-    return InvestmentAssetsOut(
-        base_currency=base_currency, total_market_value=round(total, 2), total_daily_pnl=round(total_pnl, 2),
-        total_cash_balance=round(total_cash, 2), total_assets=round(total_cash + total, 2),
-        investment_accounts=accounts, items=items,
-    )
+) -> dict:
+    from ...services.investment_valuation import investment_assets
+    return await investment_assets(db, current_user.id, refresh)
 
 
 @router.get("/exchange-rates", response_model=ExchangeRatesOut)

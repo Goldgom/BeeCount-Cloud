@@ -4,158 +4,91 @@
 
 @layer base {
   :root {
-    --background: 210 25% 97%;
-    --foreground: 220 20% 16%;
+    color-scheme: light;
+    --background: 240 14% 97%;
+    --foreground: 240 6% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 216 23% 18%;
+    --card-foreground: 240 6% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 216 23% 18%;
-    --primary: 38 92% 52%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 43 95% 92%;
-    --secondary-foreground: 216 23% 18%;
-    --muted: 220 20% 94%;
-    --muted-foreground: 220 9% 45%;
-    /* accent 跟随 primary 色相:primary-color-script.ts 会动态设
-       --accent-light;这里用 fallback 兜底(JS 还没跑到的首帧)。 */
-    --accent: var(--accent-light, 38 80% 90%);
-    --accent-foreground: 216 23% 18%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 16% 88%;
-    --input: 220 16% 88%;
-    --ring: 38 92% 52%;
-    --radius: 0.75rem;
-    --shadow: 38 40% 28%;
+    --popover-foreground: 240 6% 12%;
+    --primary: 211 100% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 94%;
+    --secondary-foreground: 240 6% 18%;
+    --muted: 240 6% 95%;
+    --muted-foreground: 240 4% 42%;
+    --accent: var(--accent-light, 211 80% 94%);
+    --accent-foreground: 240 6% 12%;
+    --destructive: 3 75% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 88%;
+    --input: 240 6% 82%;
+    --ring: 211 100% 42%;
+    --radius: 0.875rem;
+    --shadow: 240 8% 20%;
   }
-
   .dark {
-    --background: 220 16% 8%;
-    --foreground: 210 40% 98%;
-    --card: 220 15% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 0 0% 12%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 43 96% 56%;
-    --primary-foreground: 0 0% 10%;
-    --secondary: 220 13% 19%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 218 16% 14%;
-    --muted-foreground: 217 10% 65%;
-    --accent: var(--accent-dark, 40 85% 22%);
-    /* accent 亮/暗统一用浅色底(见 primary-color-script),foreground 深色文字。
-       另:当前代码里已不再用 `text-accent-foreground`(交互 hover 统一走 bg-primary/15
-       text-primary),这个变量只给将来未预见的使用场景作兜底。 */
-    --accent-foreground: 216 23% 18%;
-    --destructive: 0 74% 58%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 17% 23%;
-    --input: 217 17% 23%;
-    --ring: 43 96% 56%;
-    --shadow: 215 70% 2%;
+    color-scheme: dark;
+    --background: 240 5% 6%;
+    --foreground: 240 6% 95%;
+    --card: 240 4% 11%;
+    --card-foreground: 240 6% 95%;
+    --popover: 240 4% 14%;
+    --popover-foreground: 240 6% 95%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 18%;
+    --secondary-foreground: 240 6% 95%;
+    --muted: 240 4% 15%;
+    --muted-foreground: 240 4% 67%;
+    --accent: var(--accent-dark, 211 35% 22%);
+    --accent-foreground: 240 6% 95%;
+    --destructive: 3 85% 62%;
+    --border: 240 4% 22%;
+    --input: 240 4% 30%;
+    --shadow: 0 0% 0%;
   }
-
-  /* 收支颜色方案：跟随 mobile incomeExpenseColorSchemeProvider。默认 red =
-     income (mobile 默认 true)。AppPage 在 loadProfile / WS profile_change
-     收到字段后设置 <html data-income-color="red|green">。
-     默认（未设置 data 属性）走 "red" 分支，跟 mobile 默认一致。 */
-  :root,
-  html[data-income-color="red"] {
-    --income-rgb: 239 68 68;   /* rose-500  */
-    --expense-rgb: 16 185 129; /* emerald-500 */
-  }
-  html[data-income-color="green"] {
-    --income-rgb: 16 185 129;
-    --expense-rgb: 239 68 68;
-  }
-
-  * {
-    @apply border-border;
-  }
-
+  :root, html[data-income-color="red"] { --income-rgb: 198 52 48; --expense-rgb: 18 126 83; }
+  html[data-income-color="green"] { --income-rgb: 18 126 83; --expense-rgb: 198 52 48; }
+  .dark { --income-rgb: 255 110 105; --expense-rgb: 65 195 137; }
+  html.dark[data-income-color="green"] { --income-rgb: 65 195 137; --expense-rgb: 255 110 105; }
+  * { @apply border-border; }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family:
-      'Sora',
-      'Avenir Next',
-      'SF Pro Text',
-      'PingFang SC',
-      'Noto Sans CJK SC',
-      'Segoe UI',
-      sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -0.012em;
   }
+  h1, h2, h3 { text-wrap: balance; }
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+  ::selection { background: hsl(var(--primary) / .2); }
 }
 
 @layer components {
-  .card {
-    @apply rounded-xl border border-border/60 bg-card shadow-[0_1px_0_hsl(var(--border)/0.35)];
-  }
-
-  .bc-panel {
-    @apply rounded-2xl border border-border/70 bg-card/95 shadow-sm;
-    box-shadow:
-      0 8px 24px -18px hsl(var(--shadow) / 0.55),
-      0 1px 0 0 hsl(var(--primary) / 0.08) inset;
-  }
-
-  .bc-toolbar {
-    @apply rounded-xl border border-border/60 bg-muted/30 p-3;
-  }
-
-  .bc-table-head {
-    @apply h-11 bg-muted/45 text-xs uppercase tracking-wide text-muted-foreground;
-  }
-
-  .bc-glass {
-    @apply border border-border/70 bg-card;
-    box-shadow: 0 10px 30px -18px hsl(var(--shadow) / 0.45);
-  }
-
-  .bc-hero-border {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .bc-hero-border::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(
-      120deg,
-      hsl(var(--primary) / 0.45),
-      hsl(var(--primary) / 0.1),
-      hsl(var(--secondary) / 0.34)
-    );
-    mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
-  }
+  .card, .bc-panel { @apply rounded-2xl border border-border/60 bg-card; box-shadow: 0 2px 12px -6px hsl(var(--shadow) / .12); }
+  .bc-toolbar { @apply rounded-xl bg-muted/60 p-3; }
+  .bc-table-head { @apply h-12 bg-muted/40 text-xs font-medium text-muted-foreground; }
+  .bc-glass { @apply border border-border/60 bg-card/90 backdrop-blur-xl; }
+  .bc-hero-border { @apply overflow-hidden rounded-2xl border border-border/60; }
+  .bc-app-header { @apply border-b border-border/60 bg-background/85 backdrop-blur-xl; }
+  .bc-main { @apply mx-auto w-full max-w-[1600px] px-4 pb-8 pt-6 sm:px-6 lg:pl-[252px] lg:pr-8 lg:pt-8; }
+  .bc-sidebar { @apply fixed bottom-0 left-0 top-14 z-30 w-[220px] flex-col border-r border-border/50 bg-background px-3 pb-6 pt-8; }
+  .bc-sidebar-link { @apply flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground; }
+  .bc-sidebar-link.is-active { @apply bg-primary/10 text-primary; }
+  .bc-page-heading { @apply mb-6 flex flex-wrap items-end justify-between gap-3; }
+  .bc-page-heading h1 { @apply text-2xl font-semibold tracking-tight sm:text-3xl; }
+  .bc-page-heading p { @apply mt-2 text-sm text-muted-foreground; }
+  .bc-segmented { @apply inline-flex gap-1 rounded-xl bg-muted p-1; }
+  .bc-segmented button { @apply min-h-8 rounded-lg px-3 text-xs font-medium text-muted-foreground; }
+  .bc-segmented button[aria-pressed="true"] { @apply bg-card text-foreground shadow-sm; }
+  .bc-investment-table { @apply w-full min-w-[780px] text-sm; font-variant-numeric: tabular-nums; }
+  .bc-investment-table th { @apply whitespace-nowrap bg-muted/40 px-4 py-3 text-left text-xs font-medium text-muted-foreground; }
+  .bc-investment-table td { @apply border-b border-border/50 px-4 py-4 align-top; }
+  .bc-investment-table tr:last-child td { @apply border-0; }
+  .bc-skip-link { @apply fixed left-4 top-2 z-[100] -translate-y-20 rounded-xl bg-foreground px-4 py-2 text-background focus:translate-y-0; }
 }
-
-/* ===== 入场动画 ===== */
-/* 淡入 + 轻微上移。配合 inline `animation-delay` 做 stagger 级联(见 HomeHero)。 */
-.bee-rise-in {
-  animation: bee-rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes bee-rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* 尊重系统"减少动态效果":直接展示终态,不做入场。 */
+.bee-rise-in { animation: bee-rise-in .35s ease-out both; }
+@keyframes bee-rise-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .bee-rise-in {
-    animation: none;
-  }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

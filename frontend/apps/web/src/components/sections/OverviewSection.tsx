@@ -91,7 +91,8 @@ export function OverviewSection({
   ).length
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="bc-page-heading"><h1>{t('nav.overview')}</h1></div>
       <HomeHero
         ledgers={ledgers}
         currentLedgerId={activeLedgerId || undefined}
@@ -115,15 +116,6 @@ export function OverviewSection({
       />
 
       <HomeInvestmentHoldings data={investmentAssets} />
-
-      {/* 扩展分析:Web 端独有的加强仪表,不属于 mobile 首页对标范围 */}
-      <div className="flex items-center gap-2 pt-2">
-        <span className="h-px flex-1 bg-border/60" aria-hidden />
-        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          {t('analytics.ext.title')}
-        </span>
-        <span className="h-px flex-1 bg-border/60" aria-hidden />
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <HomeMonthCategoryDonut ranks={currentMonthCategoryRanks} currency={currency} />

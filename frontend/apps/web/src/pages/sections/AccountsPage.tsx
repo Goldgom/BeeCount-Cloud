@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import {
   createAccount,
@@ -48,6 +48,7 @@ import {
   type CurrencyBucket,
 } from '@beecount/web-features'
 
+import { HomeInvestmentHoldings } from '../../components/dashboard/HomeInvestmentHoldings'
 import { NetWorthTrend } from '../../components/dashboard/NetWorthTrend'
 import { ASSET_VIEW_KEY, type AssetView } from '../../lib/assetViewPrefs'
 import { routePath } from '../../state/router'
@@ -171,7 +172,7 @@ export function AccountsPage() {
         const cur = (a.currency || '').toUpperCase()
         if (cur) distinct.add(cur)
       }
-      if (base && distinct.size >= 2) {
+      if (base) {
         const [r, o] = await Promise.all([
           fetchExchangeRates(token, base).catch(() => null),
           fetchExchangeRateOverrides(token).catch(() => [] as ExchangeRateOverride[]),
@@ -353,6 +354,29 @@ export function AccountsPage() {
   //   - buckets:每币种 summary + 分组,既给合并 donut(mergeGroupsToBase),也给详情 dialog 的分币种卡复用。
   //   - mergedGroups:各币种 groups × 汇率折算后按 type 聚合成一份主币种构成,喂 donut(currency=effectiveBase)。
   const converted = useMemo(() => {
+    const authoritative = investmentAssets?.all_assets_summary
+    if (authoritative) {
+      const positive = authoritative.components.filter((c) => typeof c.amount_base === 'number' && c.amount_base >= 0)
+      const negative = authoritative.components.filter((c) => typeof c.amount_base === 'number' && c.amount_base < 0)
+      const groups = (['account_cash', 'investment_holding', 'receivable'] as const).map((kind, index) => ({
+        type: kind,
+        label: t(kind === 'investment_holding' ? 'accounts.investment.holdings' : kind === 'receivable' ? 'finance.receivables' : 'accounts.investment.cash'),
+        color: ['#0071e3', '#8e8e93', '#34a875'][index],
+        isLiability: false,
+        rows: [],
+        subtotals: [{ currency: authoritative.base_currency, value: positive.filter((c) => c.kind === kind).reduce((sum, c) => sum + c.amount_base!, 0) }],
+      }))
+      return {
+        needsBase: false as const, base: authoritative.base_currency,
+        singleCurrency: authoritative.components.every((c) => c.currency === authoritative.base_currency),
+        netWorth: authoritative.net_equity ?? authoritative.known_total_assets,
+        assetTotal: positive.reduce((sum, c) => sum + c.amount_base!, 0),
+        liabilityTotal: negative.reduce((sum, c) => sum + c.amount_base!, 0),
+        mergedGroups: groups, buckets: [] as CurrencyBucket[],
+        missing: [...new Set(authoritative.components.filter((c) => c.amount_base === null).map((c) => c.currency))],
+        rateDate: undefined as string | undefined,
+      }
+    }
     const byCur = splitByCurrency(rows)
     // Workspace account balances already include an investment account's cash.
     // Add only its bound holdings here, otherwise cash would be double-counted.
@@ -364,6 +388,7 @@ export function AccountsPage() {
     )
     for (const item of investmentAssets?.items ?? []) {
       if (!item.account_id || !boundInvestmentAccountIds.has(item.account_id)) continue
+      if (typeof item.market_value !== 'number' || !Number.isFinite(item.market_value)) continue
       const currency = (item.currency || 'CNY').toUpperCase()
       holdingValueByCurrency.set(
         currency,
@@ -378,7 +403,7 @@ export function AccountsPage() {
     const effectiveBase = base || (byCur.size === 1 ? [...byCur.keys()][0] : '')
     if (!effectiveBase) return { needsBase: true } as const
     // 单币种(effectiveBase 即本币 且 仅 1 种)不显汇率脚注 / ≈ 前缀。
-    const singleCurrency = byCur.size === 1
+    const singleCurrency = byCur.size === 1 && byCur.has(effectiveBase)
 
     const buckets: CurrencyBucket[] = []
     let netWorth = 0
@@ -451,7 +476,7 @@ export function AccountsPage() {
   const investmentPriceStatuses = useMemo<Record<string, 'manual' | 'fallback' | 'live'>>(
     () => Object.fromEntries(
       (investmentAssets?.investment_accounts ?? []).map((account) => {
-        const hasFallback = account.items.some((item) => item.price_status === 'fallback')
+        const hasFallback = account.items.some((item) => item.price_status === 'fallback' || item.price_status === 'missing')
         const hasManual = account.items.some((item) => item.price_status === 'manual')
         return [account.account_id, hasFallback ? 'fallback' : hasManual ? 'manual' : 'live']
       }),
@@ -461,6 +486,8 @@ export function AccountsPage() {
 
   return (
     <>
+      <div className="bc-page-heading"><div><h1>{t('accounts.title')}</h1><p>{t('accounts.investment.assetHint')}</p></div><Link to="/app/finance" className="text-sm text-primary">{t('finance.title')}</Link></div>
+      {!investmentAssets && rows.some((row) => row.account_type === 'investment') ? <p role="status" className="rounded-xl bg-muted p-4 text-sm text-muted-foreground">{t('accounts.investment.valuationPending')}</p> : null}
       {/* 资产汇总卡(统一折算视图)—— 四态:
           - converted===null(无账户):不出卡,账户空态由 AccountsPanel 内部引导。
           - converted.needsBase(多币种未设主币种):出「设置主币种」引导卡,按钮跳设置页。
@@ -492,34 +519,43 @@ export function AccountsPage() {
           <CardContent className="space-y-3 p-5">
             <div className="min-w-0 space-y-1">
               <p className="text-xs text-muted-foreground">
-                {converted.rateDate
+                {converted.missing.length || (investmentAssets?.all_assets_summary?.completeness ?? investmentAssets?.completeness) === 'partial' || !investmentAssets
+                  ? t('accounts.investment.partialNet')
+                  : !converted.singleCurrency
                   ? t('accounts.converted.netWorth', { currency: converted.base })
                   : t('accounts.netWorth')}
               </p>
               <div className="flex items-baseline gap-1">
-                {converted.rateDate ? (
+                {!converted.singleCurrency ? (
                   <span className="font-mono text-sm text-muted-foreground">≈</span>
                 ) : null}
                 <Amount
                   value={converted.netWorth}
                   currency={converted.base}
                   showCurrency
-                  size="2xl"
+                  size="3xl"
+                  compact={false}
                   bold
-                  tone={converted.netWorth >= 0 ? 'positive' : 'negative'}
+                  tone="default"
                 />
               </div>
             </div>
 
+            {investmentAssets?.all_assets_summary ? <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full bg-muted px-2.5 py-1">{converted.base}</span>
+              <span>{t('accounts.investment.componentCoverage', { valued: investmentAssets.all_assets_summary.coverage.components_valued, total: investmentAssets.all_assets_summary.coverage.components_total })}</span>
+              <span>{t('accounts.investment.generatedAt')}: {investmentAssets.all_assets_summary.as_of}</span>
+            </div> : null}
+
             {/* 资产 / 负债两个小项(与净资产同口径:缺失汇率币种已剔除)。
                 多币种带 ≈,单币种不带。 */}
             <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
+              <div className="rounded-xl bg-muted/50 px-4 py-4">
                 <div className="text-[10px] uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80">
                   {t('accounts.assets')}
                 </div>
                 <div className="mt-0.5 flex items-baseline gap-1">
-                  {converted.rateDate ? (
+                  {!converted.singleCurrency ? (
                     <span className="font-mono text-xs text-muted-foreground">≈</span>
                   ) : null}
                   <Amount
@@ -532,12 +568,12 @@ export function AccountsPage() {
                   />
                 </div>
               </div>
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 px-3 py-2">
+              <div className="rounded-xl bg-muted/50 px-4 py-4">
                 <div className="text-[10px] uppercase tracking-wider text-rose-600/80 dark:text-rose-400/80">
                   {t('accounts.liabilities')}
                 </div>
                 <div className="mt-0.5 flex items-baseline gap-1">
-                  {converted.rateDate ? (
+                  {!converted.singleCurrency ? (
                     <span className="font-mono text-xs text-muted-foreground">≈</span>
                   ) : null}
                   <Amount
@@ -557,11 +593,12 @@ export function AccountsPage() {
                 选择设备级持久化(见 ASSET_VIEW_KEY)。无构成数据时构成 tab 退化为空。
                 单币种 approx=false(不显 ≈),多币种 approx=true。 */}
             <div>
-              <div className="mb-2 flex justify-end gap-1">
+              <div className="bc-segmented mb-3">
                 {(['composition', 'trend'] as AssetView[]).map((v) => (
                   <button
                     key={v}
                     type="button"
+                    aria-pressed={trendOrComposition === v}
                     onClick={() => setTrendOrComposition(v)}
                     className={`rounded-full px-2 py-0.5 text-[11px] ${
                       trendOrComposition === v
@@ -574,25 +611,25 @@ export function AccountsPage() {
                 ))}
               </div>
               {trendOrComposition === 'trend' ? (
-                <NetWorthTrend data={netWorthHistory} embedded />
+                <div className="space-y-2"><p className="text-xs text-muted-foreground">{t('accounts.investment.historyScope')}</p><NetWorthTrend data={netWorthHistory} embedded /></div>
               ) : converted.mergedGroups.length > 0 ? (
                 <AssetsCompositionMini
                   groups={converted.mergedGroups}
                   currency={converted.base}
                   showCurrency
                   embedded
-                  approx={Boolean(converted.rateDate)}
+                  approx={!converted.singleCurrency}
                 />
               ) : null}
             </div>
 
             {/* 脚注 + 详情:仅多币种折算态出现(单币种 rateDate 为空,
                 既无汇率脚注也无分币种明细可看)。 */}
-            {converted.rateDate ? (
+            {!converted.singleCurrency || investmentAssets?.all_assets_summary ? (
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                   <span className="text-[11px] text-muted-foreground">
-                    {t('accounts.converted.footnote', { date: converted.rateDate })}
+                    {investmentAssets?.all_assets_summary ? t('accounts.investment.observationHint') : converted.rateDate ? t('accounts.converted.footnote', { date: converted.rateDate }) : t('accounts.investment.coverageUnknown')}
                   </span>
                   {converted.missing.length > 0 ? (
                     <span className="text-[11px] text-amber-600 dark:text-amber-500">
@@ -610,51 +647,7 @@ export function AccountsPage() {
           </CardContent>
         </Card>
       )}
-      {investmentAssets && investmentAssets.investment_accounts.length > 0 ? (
-        <Card className="bc-panel mb-4">
-          <CardContent className="space-y-3 p-5">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold">{t('accounts.investment.holdings')}</p>
-                <p className="text-xs text-muted-foreground">{t('accounts.investment.subtitle')}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] text-muted-foreground">Total assets</div>
-                <Amount value={investmentAssets.total_assets} currency={investmentAssets.base_currency} showCurrency bold />
-                <div className="text-xs text-muted-foreground">Cash {investmentAssets.total_cash_balance.toFixed(2)} · Holdings {investmentAssets.total_market_value.toFixed(2)}</div>
-                <div className={investmentAssets.total_daily_pnl >= 0 ? 'text-xs text-emerald-600' : 'text-xs text-rose-600'}>
-                  {t('accounts.investment.dailyPnl')}: {investmentAssets.total_daily_pnl >= 0 ? '+' : ''}
-                  {investmentAssets.total_daily_pnl.toFixed(2)}
-                </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="px-2 py-2">{t('accounts.investment.product')}</th>
-                  <th className="px-2 py-2">{t('accounts.investment.quantity')}</th>
-                  <th className="px-2 py-2">{t('accounts.investment.costPrice')}</th>
-                  <th className="px-2 py-2">{t('accounts.investment.marketPrice')}</th>
-                  <th className="px-2 py-2">{t('accounts.investment.marketValue')}</th>
-                  <th className="px-2 py-2">{t('accounts.investment.holdingPnl')}</th>
-                  <th className="px-2 py-2">{t('accounts.investment.dailyPnl')}</th>
-                </tr></thead>
-                <tbody>{investmentAssets.items.map((item) => (
-                  <tr key={item.id} className="border-b last:border-0">
-                    <td className="px-2 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.symbol}{item.market ? ` · ${item.market}` : ''}{item.account_name ? ` · ${item.account_name}` : ''}</div></td>
-                    <td className="px-2 py-2">{item.quantity}</td>
-                    <td className="px-2 py-2">{item.cost_basis.toFixed(2)}</td>
-                    <td className="px-2 py-2"><div>{item.current_price?.toFixed(2) ?? '—'}</div>{item.day_change !== null ? <div className={item.day_change >= 0 ? 'text-[10px] text-emerald-600' : 'text-[10px] text-rose-600'}>{item.day_change >= 0 ? '+' : ''}{item.day_change.toFixed(2)} / day</div> : null}</td>
-                    <td className="px-2 py-2"><Amount value={item.market_value} currency={item.currency} showCurrency /></td>
-                    <td className={item.holding_pnl >= 0 ? 'px-2 py-2 text-emerald-600' : 'px-2 py-2 text-rose-600'}>{item.holding_pnl >= 0 ? '+' : ''}{item.holding_pnl.toFixed(2)}</td>
-                    <td className={item.daily_pnl >= 0 ? 'px-2 py-2 text-emerald-600' : 'px-2 py-2 text-rose-600'}>{item.daily_pnl >= 0 ? '+' : ''}{item.daily_pnl.toFixed(2)}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <HomeInvestmentHoldings data={investmentAssets} />
       <AccountsPanel
         form={form}
         rows={rows}
@@ -742,7 +735,8 @@ export function AccountsPage() {
           </DialogHeader>
           {converted && !converted.needsBase ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              {converted.buckets.map((entry) => (
+              {investmentAssets?.all_assets_summary ? <div className="sm:col-span-2 overflow-x-auto rounded-xl border border-border/60"><table className="bc-investment-table"><thead><tr><th>{t('accounts.investment.product')}</th><th>{t('finance.amount')}</th><th>{converted.base}</th><th>{t('accounts.investment.fxPath')}</th><th>{t('accounts.investment.observedAt')}</th></tr></thead><tbody>{investmentAssets.all_assets_summary.components.map((component) => <tr key={`${component.kind}:${component.id}`}><td>{component.name || component.id}<p className="mt-1 text-xs text-muted-foreground">{t(component.kind === 'receivable' ? 'finance.receivables' : component.kind === 'investment_holding' ? 'accounts.investment.holdings' : 'accounts.investment.cash')}</p></td><td><Amount value={component.amount} currency={component.currency} showCurrency compact={false} /></td><td><Amount value={component.amount_base} currency={converted.base} showCurrency compact={false} /></td><td className="text-xs text-muted-foreground">{component.fx?.path?.length ? component.fx.path.map((leg) => `${leg.from_currency} → ${leg.to_currency} × ${leg.rate} · ${leg.source} · ${leg.rate_date || '—'}${leg.stale ? ' · ' + t('accounts.investment.staleFx') : ''}`).join(' / ') : component.fx?.status || '—'}</td><td className="text-xs text-muted-foreground">{component.as_of || t('accounts.investment.timeUnknown')}</td></tr>)}</tbody></table></div> : null}
+            {converted.buckets.map((entry) => (
                 <CurrencyAssetCard key={entry.currency} entry={entry} />
               ))}
             </div>

@@ -3,6 +3,7 @@ export type AppSection =
   | 'transactions'
   | 'calendar'
   | 'accounts'
+  | 'finance'
   | 'categories'
   | 'tags'
   | 'budgets'

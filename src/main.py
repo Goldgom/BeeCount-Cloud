@@ -25,7 +25,7 @@ from .observability import configure_logging, install_request_middleware
 from .bootstrap_admin import ensure_admin
 from .routers import admin, attachments, auth, devices, pats, profile, read, sync, write, ws
 from .routers import admin_backup, mcp_calls, two_factor
-from .routers import investment_products
+from .routers import investment_products, finance
 from .routers import ai as ai_router
 from .routers import import_data as import_router
 from .routers import invites as invites_router
@@ -77,6 +77,24 @@ def public_version() -> dict:
     return {"name": _beecount_cloud_name, "version": _beecount_cloud_version}
 
 app.state.ws_manager = WSConnectionManager()
+from .mcp.tools.finance_tools import set_ws_manager as set_finance_ws_manager
+set_finance_ws_manager(app.state.ws_manager)
+
+@app.on_event("startup")
+async def _start_finance_snapshot_scheduler():
+    from .services.finance_scheduler import scheduler
+    try:
+        scheduler.start()
+    except Exception:
+        logging.getLogger(__name__).exception("finance.snapshot.scheduler.start_failed")
+
+@app.on_event("shutdown")
+async def _stop_finance_snapshot_scheduler():
+    from .services.finance_scheduler import scheduler
+    try:
+        scheduler.shutdown()
+    except Exception:
+        logging.getLogger(__name__).exception("finance.snapshot.scheduler.shutdown_failed")
 install_request_middleware(app)
 register_exception_handlers(app)
 
@@ -160,6 +178,7 @@ app.include_router(read.router, prefix=f"{settings.api_prefix}/read", tags=["rea
 app.include_router(write.router, prefix=f"{settings.api_prefix}/write", tags=["write"])
 app.include_router(attachments.router, prefix=f"{settings.api_prefix}/attachments", tags=["attachments"])
 app.include_router(investment_products.router, prefix=f"{settings.api_prefix}/investment-products", tags=["investment-products"])
+app.include_router(finance.router, prefix=settings.api_prefix)
 app.include_router(profile.router, prefix=f"{settings.api_prefix}/profile", tags=["profile"])
 app.include_router(pats.router, prefix=f"{settings.api_prefix}/profile/pats", tags=["pats"])
 app.include_router(

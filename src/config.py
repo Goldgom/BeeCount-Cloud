@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     restore_dir: str = "./data/restore"
     # 调度器开关。测试和某些命令行场景关掉避免后台 thread 干扰。
     backup_scheduler_enabled: bool = Field(default=True, alias="BACKUP_SCHEDULER_ENABLED")
+    finance_snapshot_scheduler_enabled: bool = Field(default=True, alias="FINANCE_SNAPSHOT_SCHEDULER_ENABLED")
     # 调度器时区(影响 cron 解释)。空 = 走 tzlocal(读 TZ env 或 /etc/localtime)。
     # 显式设置 IANA 时区名(如 'Asia/Shanghai')可绕开 tzlocal 失效坑 — 容器
     # 没装 tzdata 时 tzlocal 会静默 fallback UTC,"0 4 * * *" 就在 UTC 4 点

@@ -40,8 +40,9 @@ export function MobileBottomNav({ activeSection, onNavigate }: Props) {
             <button
               key={section}
               type="button"
+              aria-current={active ? 'page' : undefined}
               onClick={() => onNavigate(section)}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] transition-colors ${
+              className={`relative flex flex-1 flex-col items-center justify-center min-h-14 gap-0.5 py-2 text-[11px] transition-colors ${
                 active ? 'text-primary' : 'text-muted-foreground'
               }`}
             >

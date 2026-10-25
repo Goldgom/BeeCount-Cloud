@@ -1,8 +1,8 @@
 /** Local storage key for user's custom primary color (hex). */
 export const PRIMARY_COLOR_STORAGE_KEY = 'beecount.primary-color'
 
-/** Default matches mobile `BeeTheme.honeyGold` hex. */
-export const DEFAULT_PRIMARY_COLOR = '#F59E0B'
+/** Neutral Apple-style blue; explicit local/server preferences remain authoritative. */
+export const DEFAULT_PRIMARY_COLOR = '#0071E3'
 
 /**
  * 预设色板（对齐 mobile `personalize_page.dart` 的常用色，加上几种互补）。
@@ -75,12 +75,18 @@ export function applyPrimaryColor(hex: string): void {
   const root = document.documentElement
   root.style.setProperty('--primary', primaryValue)
   root.style.setProperty('--ring', primaryValue)
+  const luminance = [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map((part) => {
+    const v = parseInt(part, 16) / 255
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  })
+  const brightness = luminance[0] * 0.2126 + luminance[1] * 0.7152 + luminance[2] * 0.0722
+  root.style.setProperty('--primary-foreground', brightness > 0.179 ? '0 0% 8%' : '0 0% 100%')
   // Accent: light/dark 都用同一组 hue + 固定 s/l。实验下来浅色方案(80% 90%)
   // 在深底板上也好看 —— 按钮/hover 浮起来一层薄薄的主题色,跨所有色相稳定,
   // 不再需要为"蓝紫在 hsl 低亮度显脏"这种色空间特性单独调参。
   const accentValue = `${h} 80% 90%`
   root.style.setProperty('--accent-light', accentValue)
-  root.style.setProperty('--accent-dark', accentValue)
+  root.style.setProperty('--accent-dark', `${h} 30% 22%`)
 }
 
 /** 初次加载时从 localStorage 读；没有则用默认色。不写 style.setProperty

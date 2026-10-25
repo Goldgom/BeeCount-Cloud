@@ -784,6 +784,7 @@ __all__ = [
     '_owner_map_for_ledgers',
     '_user_info_map',
     '_is_ledger_deleted',
+    '_deleted_ledger_ids',
     '_visible_workspace_ledgers',
     '_snapshot_ledger_info',
     '_resolve_ledger_name',

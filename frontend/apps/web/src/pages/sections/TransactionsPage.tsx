@@ -1775,7 +1775,8 @@ export function TransactionsPage() {
 
   return (
     <>
-        <div className="space-y-4 pb-20 md:pb-0">
+        <div className="space-y-5 pb-20 md:pb-0">
+          <div className="bc-page-heading"><h1>{t('transactions.title')}</h1></div>
           {/* overview 已迁出到 OverviewPage */}
 
           {route.section === 'transactions' ? (
@@ -1785,10 +1786,11 @@ export function TransactionsPage() {
                   左组 = 搜索输入 + 筛选;右组 = 导出 / 新建,
                   ml-auto 套在右组上(而不是单按钮),即便其中一个 button 隐藏
                   另一个仍会贴右,不会跟左组贴在一起。 */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2">
+              <div className="bc-toolbar flex flex-wrap items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <Input
-                    className="h-9 w-[260px] bg-muted lg:w-[360px]"
+                    aria-label={t('shell.placeholder.keyword')}
+                    className="h-10 w-full max-w-[360px] bg-card"
                     placeholder={t('shell.placeholder.keyword')}
                     value={listQuery}
                     onChange={(event) => setListQuery(event.target.value)}
